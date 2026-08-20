@@ -1,0 +1,11 @@
+Adil Academy Protected Video Player Update v22
+
+Changes:
+- Replaces direct YouTube/Vimeo controls with Adil Academy custom play/pause/fullscreen controls.
+- Blocks normal iframe clicking and right-click copying from the embedded player.
+- Hides provider controls, share UI, keyboard controls, and direct fullscreen button.
+- Adds a moving student account watermark to discourage screen recording/sharing.
+- Applies protection in My Course and Q & A retake player.
+
+Important:
+This prevents easy/casual link copying. No browser-based YouTube embed can guarantee 100% protection from a technically skilled user using developer tools.

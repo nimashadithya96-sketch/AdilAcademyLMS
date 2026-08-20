@@ -1,0 +1,47 @@
+{
+  "name": "adil-academy-lms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server/index.ts",
+    "preview:stable": "npm run build && SERVE_STATIC=true tsx server/index.ts",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist-server",
+    "start": "NODE_ENV=production node dist-server/index.js",
+    "check": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
+    "db:seed": "tsx db/seed-run.ts",
+    "job:inactivity-reset": "tsx jobs/inactivity-reset.ts",
+    "job:weekly-commission": "tsx jobs/weekly-commission.ts"
+  },
+  "dependencies": {
+    "@replit/object-storage": "^1.0.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "argon2": "^0.44.0",
+    "drizzle-orm": "^0.44.7",
+    "express": "^5.1.0",
+    "lucide-react": "^0.468.0",
+    "nodemailer": "^9.0.3",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.6",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.1",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.7",
+    "esbuild": "^0.27.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4",
+    "vitest": "^4.0.15"
+  }
+}

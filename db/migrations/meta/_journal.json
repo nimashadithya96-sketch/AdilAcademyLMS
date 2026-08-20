@@ -1,0 +1,139 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1784192013670,
+      "tag": "0000_big_susan_delgado",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784192093139,
+      "tag": "0001_lazy_korvac",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784192547951,
+      "tag": "0002_tense_multiple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784215388772,
+      "tag": "0003_admission_otp_flow",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784227928000,
+      "tag": "0004_secure_pay_ids",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784347200000,
+      "tag": "0007_cco_activation_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784383200000,
+      "tag": "0008_cco_trial_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784386800000,
+      "tag": "0009_network_placement_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784390400000,
+      "tag": "0010_admission_heroes",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784394000000,
+      "tag": "0011_learning_portal_control",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784518200000,
+      "tag": "0012_live_customer_support",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784620800000,
+      "tag": "0013_reconcile_admission_points",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784707200000,
+      "tag": "0014_repair_live_customer_support",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784709000000,
+      "tag": "0015_cco_main_buy",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784730600000,
+      "tag": "0016_consultant_registration_payment_plan",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1784700000000,
+      "tag": "0017_balance_payment_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1784736000000,
+      "tag": "0018_student_safe_removal",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785686400000,
+      "tag": "0019_admin_student_registration",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785688200000,
+      "tag": "0020_lesson_q_and_a",
+      "breakpoints": true
+    }
+  ]
+}

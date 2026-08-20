@@ -1,0 +1,20 @@
+modules = ["nodejs-22"]
+run = "npm run dev"
+
+[deployment]
+build = ["sh", "-c", "npm run build"]
+run = ["sh", "-c", "npm start"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 24678
+externalPort = 3000
+
+[agent]
+expertMode = true
+
+[objectStorage]
+defaultBucketID = "replit-objstore-ffcb7931-d598-4eba-8c80-6132a73e8ea7"

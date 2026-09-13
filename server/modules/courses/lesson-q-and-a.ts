@@ -69,11 +69,11 @@ async function requireCompletedLesson(userId: string, lessonId: string) {
       and(
         eq(lessons.id, lessonId),
         eq(enrollments.status, "ACTIVE"),
-        gte(lessonProgress.progressPercent, 100)
+        gte(lessonProgress.progressPercent, 80)
       )
     )
     .limit(1);
-  if (!record) throw new HttpError(403, "Complete this video lesson before opening its Q & A.");
+  if (!record) throw new HttpError(403, "Watch at least 80% of this video lesson before opening its Q & A.");
   return record;
 }
 
@@ -132,7 +132,7 @@ lessonQandARouter.get(
         and(
           eq(enrollments.userId, user.id),
           eq(enrollments.status, "ACTIVE"),
-          gte(lessonProgress.progressPercent, 100)
+          gte(lessonProgress.progressPercent, 80)
         )
       )
       .orderBy(asc(courses.title), asc(courseSections.position), asc(lessons.position));

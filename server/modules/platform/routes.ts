@@ -700,6 +700,7 @@ platformRouter.post(
     }
     response.status(201).json({
       registration: { id: result.registration.id, status: result.registration.status, source: result.registration.registrationSource },
+      payId: code,
       payIdSent: true,
       expiresAt
     });

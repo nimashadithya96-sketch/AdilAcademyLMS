@@ -3386,7 +3386,7 @@ button {
 
 
 /* Student course lesson player */
-.student-course-workspace{display:grid;gap:20px}.student-course-layout{display:grid;grid-template-columns:minmax(260px,.78fr) minmax(0,1.55fr);gap:18px;align-items:start}.student-course-catalog,.student-course-player{min-width:0;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.018)}.student-course-catalog{padding:15px;display:grid;gap:16px;max-height:720px;overflow:auto}.student-course-module{display:grid;gap:9px}.student-course-module+.student-course-module{padding-top:15px;border-top:1px solid var(--line)}.student-course-module-heading{display:grid;gap:4px}.student-course-module-heading>span{font-size:9px;font-weight:900;color:var(--gold)}.student-course-module-heading>strong{font-size:12px}.student-course-module-heading>small{font-size:8px;color:var(--muted)}.student-course-lessons{display:grid;gap:7px}.student-course-lessons>button{width:100%;padding:11px;border:1px solid var(--line);border-radius:11px;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:9px;align-items:center;text-align:left;background:var(--bg-soft);color:var(--text);cursor:pointer}.student-course-lessons>button:hover:not(:disabled),.student-course-lessons>button.active{border-color:var(--line-bright);background:rgba(139,255,85,.07)}.student-course-lessons>button.locked{opacity:.58;cursor:not-allowed}.student-course-lessons>button>span:nth-child(2){display:grid;gap:4px;min-width:0}.student-course-lessons b{font-size:10px;line-height:1.45}.student-course-lessons small{font-size:8px;color:var(--muted)}.student-course-lesson-icon{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;background:rgba(139,255,85,.08);color:var(--green)}.student-course-player{padding:20px;min-height:480px}.student-course-player-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}.student-course-player-heading h3{margin:5px 0;font-size:22px}.student-course-player-heading p{margin:0;color:var(--muted);font-size:9px}.student-lesson-video{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 16px 45px rgba(0,0,0,.24)}.student-lesson-video iframe{width:100%;height:100%;border:0}.student-lesson-note{margin-top:15px;padding:15px;border:1px solid var(--line);border-radius:12px;background:var(--bg-soft)}.student-lesson-note p{margin:7px 0 0;white-space:pre-wrap;line-height:1.75;color:var(--muted);font-size:10px}.student-lesson-progress{margin-top:16px;display:grid;gap:10px}.student-lesson-progress>div:first-child{display:flex;align-items:center;justify-content:space-between;font-size:10px}.student-lesson-progress .button{justify-self:start}.dashboard-theme-light .student-course-catalog,.dashboard-theme-light .student-course-player,.dashboard-theme-light .student-lesson-note{background:#fff;border-color:#bfd0c2}.dashboard-theme-light .student-course-lessons>button{background:#f4f8f3;border-color:#bfd0c2}.dashboard-theme-light .student-course-lessons>button.active{background:#e9f7e8}@media(max-width:900px){.student-course-layout{grid-template-columns:1fr}.student-course-catalog{max-height:420px}.student-course-player{min-height:380px}}@media(max-width:600px){.student-course-player{padding:14px}.student-course-player-heading{display:grid}.student-course-lessons>button{grid-template-columns:30px minmax(0,1fr) auto}.student-lesson-progress .button{width:100%;justify-content:center}}
+.student-course-workspace{display:grid;gap:20px}.student-course-layout{display:grid;grid-template-columns:minmax(260px,.78fr) minmax(0,1.55fr);gap:18px;align-items:start}.student-course-catalog,.student-course-player{min-width:0;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.018)}.student-course-catalog{padding:15px;display:grid;gap:16px;max-height:720px;overflow:auto}.student-course-module{display:grid;gap:9px}.student-course-module+.student-course-module{padding-top:15px;border-top:1px solid var(--line)}.student-course-module-heading{display:grid;gap:4px}.student-course-module-heading>span{font-size:9px;font-weight:900;color:var(--gold)}.student-course-module-heading>strong{font-size:12px}.student-course-module-heading>small{font-size:8px;color:var(--muted)}.student-course-lessons{display:grid;gap:7px}.student-course-lessons>button{width:100%;padding:11px;border:1px solid var(--line);border-radius:11px;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:9px;align-items:center;text-align:left;background:var(--bg-soft);color:var(--text);cursor:pointer}.student-course-lessons>button:hover:not(:disabled),.student-course-lessons>button.active{border-color:var(--line-bright);background:rgba(139,255,85,.07)}.student-course-lessons>button.locked{opacity:.58;cursor:not-allowed}.student-course-lessons>button>span:nth-child(2){display:grid;gap:4px;min-width:0}.student-course-lessons b{font-size:10px;line-height:1.45}.student-course-lessons small{font-size:8px;color:var(--muted)}.student-course-lesson-icon{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;background:rgba(139,255,85,.08);color:var(--green)}.student-course-player{padding:20px;min-height:480px}.student-course-player-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}.student-course-player-heading h3{margin:5px 0;font-size:22px}.student-course-player-heading p{margin:0;color:var(--muted);font-size:9px}.student-lesson-video{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 16px 45px rgba(0,0,0,.24)}.student-lesson-video iframe{width:100%;height:100%;border:0}.student-lesson-note{margin-top:15px;padding:15px;border:1px solid var(--line);border-radius:12px;background:var(--bg-soft)}.student-lesson-note p{margin:7px 0 0;white-space:pre-wrap;line-height:1.75;color:var(--muted);font-size:10px}.student-lesson-progress{margin-top:16px;display:grid;gap:10px}.student-lesson-progress>div:first-child{display:flex;align-items:center;justify-content:space-between;font-size:10px}.student-lesson-progress .button{justify-self:start}.dashboard-theme-light .student-course-catalog,.dashboard-theme-light .student-course-player,.dashboard-theme-light .student-lesson-note{background:#fff;border-color:#bfd0c2}.dashboard-theme-light .student-course-lessons>button{background:#f4f8f3;border-color:#bfd0c2}.dashboard-theme-light .student-course-lessons>button.active{background:#e9f7e8}@media(max-width:900px){.student-course-layout{grid-template-columns:1fr}.student-course-catalog{max-height:none;overflow:visible}.student-course-inline-player{margin:4px 0 10px}.student-course-inline-player .student-course-player{min-height:0;padding:14px;border-color:var(--line-bright);box-shadow:0 12px 34px rgba(0,0,0,.18)}.student-course-player{min-height:380px}}@media(max-width:600px){.student-course-player{padding:14px}.student-course-player-heading{display:grid}.student-course-lessons>button{grid-template-columns:30px minmax(0,1fr) auto}.student-lesson-progress .button{width:100%;justify-content:center}}
 
 /* Protected lesson player: removes direct YouTube/Vimeo UI interaction and adds traceable student watermark. */
 .protected-video-shell{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 16px 45px rgba(0,0,0,.24);user-select:none;-webkit-user-select:none;isolation:isolate}
@@ -3664,4 +3664,753 @@ button {
     height: 265px !important;
     max-height: 265px !important;
   }
+}
+
+
+/* =========================================================
+   ADIL ADMIN - STUDENT VIDEO UNLOCK OVERRIDE
+   ========================================================= */
+.video-unlock-admin {
+  margin: 0 0 24px;
+  padding: 20px;
+  border: 1px solid rgba(121,255,77,.22);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(11,28,17,.94), rgba(8,14,10,.96));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+.video-unlock-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.video-unlock-heading h3 { margin:4px 0 6px; font-size:22px; }
+.video-unlock-heading p { margin:0; max-width:780px; color:#9fb0a5; line-height:1.6; }
+.video-unlock-shield { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; color:#86ff5a; background:rgba(121,255,77,.09); border:1px solid rgba(121,255,77,.2); flex:0 0 auto; }
+.video-unlock-search { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; margin-top:18px; }
+.video-unlock-search input { min-width:0; }
+.video-unlock-message { margin:12px 0 0; color:#d7e7dc; }
+.video-unlock-student { margin-top:16px; display:grid; gap:12px; }
+.video-unlock-person { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.video-unlock-person > div, .video-unlock-course { border:1px solid rgba(255,255,255,.08); border-radius:14px; background:rgba(255,255,255,.025); }
+.video-unlock-person > div { padding:14px 16px; display:grid; gap:4px; }
+.video-unlock-person small, .video-unlock-course small { color:#718178; font-size:10px; letter-spacing:.12em; }
+.video-unlock-person strong, .video-unlock-course strong { color:#f4fbf6; }
+.video-unlock-person span, .video-unlock-course span { color:#91a198; font-size:12px; }
+.video-unlock-course { padding:14px 16px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:14px; }
+.video-unlock-course > div:first-child { display:grid; gap:4px; }
+.video-unlock-status { padding:7px 10px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.08em; white-space:nowrap; }
+.video-unlock-status.unlocked { color:#86ff5a; background:rgba(121,255,77,.1); border:1px solid rgba(121,255,77,.25); }
+.video-unlock-status.normal { color:#d6b86e; background:rgba(217,168,71,.08); border:1px solid rgba(217,168,71,.2); }
+@media (max-width: 760px) {
+  .video-unlock-person { grid-template-columns:1fr; }
+  .video-unlock-search { grid-template-columns:1fr; }
+  .video-unlock-course { grid-template-columns:1fr; align-items:stretch; }
+  .video-unlock-course .button { width:100%; }
+}
+
+
+/* ADIL_MOBILE_FULLSCREEN_TOGGLE_V31
+   Used only when the browser rejects the native Fullscreen API. */
+.protected-video-shell.protected-video-shell-pseudo-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  z-index: 2147483000 !important;
+  background: #000 !important;
+}
+
+.protected-video-shell.protected-video-shell-pseudo-fullscreen iframe {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+}
+
+.protected-video-shell.protected-video-shell-pseudo-fullscreen .protected-video-controls {
+  z-index: 2147483002 !important;
+}
+
+.protected-video-shell.protected-video-shell-pseudo-fullscreen .protected-video-watermark,
+.protected-video-shell.protected-video-shell-pseudo-fullscreen .protected-video-start {
+  z-index: 2147483001 !important;
+}
+
+@supports not (height: 100dvh) {
+  .protected-video-shell.protected-video-shell-pseudo-fullscreen {
+    height: 100vh !important;
+  }
+}
+
+
+/* =========================================================
+   ADIL ACADEMY — PREMIUM MOBILE VIDEO CONTROLS v33
+   ========================================================= */
+
+.protected-video-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Invisible layer: first tap reveals the controls without
+   accidentally starting/stopping the embedded provider. */
+.protected-video-tap-layer {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 3 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: inherit !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Premium center Play/Pause control. */
+.protected-video-center-toggle {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  z-index: 7 !important;
+  width: 70px !important;
+  height: 70px !important;
+  transform: translate(-50%, -50%) scale(.9) !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255,255,255,.34) !important;
+  color: #fff !important;
+  background: rgba(5, 9, 12, .56) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
+  box-shadow:
+    0 12px 38px rgba(0,0,0,.38),
+    inset 0 0 0 1px rgba(255,255,255,.06) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    background 180ms ease !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.protected-video-center-toggle.is-visible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+}
+
+.protected-video-center-toggle:active {
+  transform: translate(-50%, -50%) scale(.94) !important;
+  background: rgba(12, 20, 24, .72) !important;
+}
+
+.protected-video-center-toggle:disabled {
+  opacity: .45 !important;
+}
+
+/* Replace the heavy black rectangle with a glass/blur control dock. */
+.protected-video-controls {
+  z-index: 6 !important;
+  left: 14px !important;
+  right: 14px !important;
+  bottom: 14px !important;
+  width: auto !important;
+  min-height: 58px !important;
+  padding: 9px 11px !important;
+  gap: 8px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  background: rgba(9, 14, 17, .44) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(145%) !important;
+  backdrop-filter: blur(18px) saturate(145%) !important;
+  box-shadow:
+    0 14px 42px rgba(0,0,0,.28),
+    inset 0 1px 0 rgba(255,255,255,.07) !important;
+}
+
+.protected-video-controls button {
+  min-width: 44px !important;
+  height: 44px !important;
+  padding: 0 11px !important;
+  border-radius: 13px !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  background: rgba(255,255,255,.075) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.protected-video-controls button:active {
+  transform: scale(.94) !important;
+  background: rgba(255,255,255,.14) !important;
+}
+
+.protected-video-tracking-label {
+  min-width: 0 !important;
+  opacity: .78 !important;
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+  letter-spacing: .04em !important;
+}
+
+/* Keep controls usable in the v31/v32 pseudo-fullscreen fallback. */
+.protected-video-shell.protected-video-shell-pseudo-fullscreen .protected-video-tap-layer {
+  z-index: 2147483001 !important;
+}
+
+.protected-video-shell.protected-video-shell-pseudo-fullscreen .protected-video-center-toggle {
+  z-index: 2147483003 !important;
+}
+
+.protected-video-shell.protected-video-shell-pseudo-fullscreen .protected-video-controls {
+  z-index: 2147483002 !important;
+}
+
+/* Mobile: compact glass dock + larger center control. */
+@media (max-width: 900px) {
+  .protected-video-center-toggle {
+    width: 68px !important;
+    height: 68px !important;
+  }
+
+  .protected-video-controls {
+    left: 10px !important;
+    right: 10px !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    min-height: 56px !important;
+    padding: 8px 9px !important;
+    border-radius: 17px !important;
+  }
+
+  .protected-video-controls button {
+    min-width: 42px !important;
+    height: 42px !important;
+    padding: 0 9px !important;
+  }
+
+  .protected-video-tracking-label {
+    flex: 1 1 auto !important;
+    font-size: 9px !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .protected-video-controls {
+    gap: 6px !important;
+  }
+
+  .protected-video-controls button {
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 0 8px !important;
+    font-size: 12px !important;
+  }
+
+  .protected-video-tracking-label {
+    font-size: 8px !important;
+  }
+}
+
+
+/* ==========================================================
+   ADIL_ACADEMY_MOBILE_SINGLE_ACTIVE_VIEW_V34
+
+   Goal:
+   - On Student -> My Course mobile lesson view, remove the
+     "box inside box inside box" appearance.
+   - Keep the actual selected lesson content prominent.
+   - Keep Video / Lesson Note / Progress as readable sections.
+   - Desktop is intentionally untouched.
+   ========================================================== */
+
+@media (max-width: 900px) {
+
+  /*
+   * Flatten likely outer/nested lesson workspace wrappers.
+   * Selectors that do not exist are harmless.
+   */
+  .student-course-shell,
+  .student-course-layout,
+  .student-course-main,
+  .student-course-content,
+  .student-course-workspace,
+  .student-lesson-shell,
+  .student-lesson-view,
+  .student-lesson-detail,
+  .student-lesson-detail-card,
+  .lesson-workspace,
+  .lesson-detail,
+  .lesson-detail-card,
+  .course-workspace,
+  .course-workspace-main,
+  .workspace-card:has(.protected-video-shell),
+  .workspace-card:has(.student-lesson-note),
+  .dash-card:has(.protected-video-shell),
+  .dash-card:has(.student-lesson-note) {
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+  }
+
+  /*
+   * Remove repeated vertical rails/edges from nested containers.
+   * This specifically targets the visual issue where several
+   * green borders appear side-by-side on a phone.
+   */
+  .student-course-shell,
+  .student-course-layout,
+  .student-course-main,
+  .student-course-content,
+  .student-course-workspace,
+  .student-lesson-shell,
+  .student-lesson-view,
+  .student-lesson-detail,
+  .student-lesson-detail-card,
+  .lesson-workspace,
+  .lesson-detail,
+  .lesson-detail-card,
+  .course-workspace,
+  .course-workspace-main {
+    border-left: 0 !important;
+    border-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /*
+   * If the lesson lives inside a generic dashboard/workspace card,
+   * flatten only the card that actually contains the active lesson.
+   */
+  .dash-card:has(.student-lesson-note),
+  .dash-card:has(.student-lesson-progress),
+  .dash-card:has(.protected-video-shell),
+  .workspace-card:has(.student-lesson-note),
+  .workspace-card:has(.student-lesson-progress),
+  .workspace-card:has(.protected-video-shell) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /*
+   * Keep the meaningful content cards. These are intentionally
+   * NOT flattened completely; the student should still clearly
+   * see "Lesson Note" and progress as separate information.
+   */
+  .student-lesson-note {
+    margin: 18px 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(117, 255, 84, .13) !important;
+    background:
+      linear-gradient(180deg, rgba(5, 17, 13, .94), rgba(5, 13, 11, .90)) !important;
+    box-shadow: 0 10px 34px rgba(0,0,0,.16) !important;
+  }
+
+  .student-lesson-progress {
+    margin: 16px 0 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .protected-video-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /*
+   * Give the active lesson one clean mobile content width.
+   * Instead of multiple nested gutters, there is one small
+   * consistent page gutter.
+   */
+  .student-lesson-note,
+  .student-lesson-progress,
+  .protected-video-shell {
+    box-sizing: border-box !important;
+  }
+
+  /*
+   * Generic duplicate wrappers immediately surrounding the
+   * meaningful lesson sections are visually neutralized.
+   */
+  div:has(> .student-lesson-note):has(> .student-lesson-progress) {
+    border-left: 0 !important;
+    border-right: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /*
+   * Prevent accidental horizontal overflow caused by old theme
+   * paddings/borders on nested course panels.
+   */
+  body,
+  #root {
+    overflow-x: hidden !important;
+  }
+}
+
+/*
+ * Very narrow phones: slightly tighter card corners/spacing.
+ */
+@media (max-width: 430px) {
+  .student-lesson-note {
+    margin: 14px 0 !important;
+    border-radius: 16px !important;
+  }
+
+  .student-lesson-progress {
+    margin-top: 14px !important;
+  }
+}
+
+/* END ADIL_ACADEMY_MOBILE_SINGLE_ACTIVE_VIEW_V34 */
+
+
+/* ==========================================================
+   ADIL_REGISTRATION_SUCCESS_MODAL_V36
+   Admin -> Students -> Register New Student
+   ========================================================== */
+
+.registration-success-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 8, 4, .72);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+}
+
+.registration-success-modal {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 28px);
+  overflow: auto;
+  padding: 30px 28px 25px;
+  border: 1px solid rgba(20, 120, 55, .15);
+  border-radius: 24px;
+  background: #ffffff;
+  color: #142018;
+  text-align: center;
+  box-shadow:
+    0 32px 90px rgba(0,0,0,.34),
+    0 10px 30px rgba(22,135,61,.10);
+}
+
+.registration-success-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #66f45b, #20be55);
+  color: #fff;
+  font-size: 39px;
+  font-weight: 900;
+  box-shadow:
+    0 14px 32px rgba(32,190,85,.25),
+    inset 0 1px 0 rgba(255,255,255,.5);
+}
+
+.registration-success-modal h3 {
+  margin: 0 0 22px;
+  color: #102117;
+  font-size: clamp(23px, 4vw, 30px);
+  line-height: 1.18;
+  letter-spacing: -.025em;
+}
+
+.registration-success-details {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.registration-success-details > div {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e1e9e3;
+  border-radius: 14px;
+  background: #f8fbf9;
+}
+
+.registration-success-details span {
+  color: #758178;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.registration-success-details strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #17221b;
+  font-size: 15px;
+}
+
+.registration-success-payid {
+  color: #10883d !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  letter-spacing: .02em;
+}
+
+.registration-success-expiry {
+  margin: 16px 0 22px;
+  padding: 18px 16px;
+  border: 1px solid #d8eadd;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f5fff7, #eefaf1);
+}
+
+.registration-success-expiry p {
+  margin: 0 0 9px;
+  color: #58665d;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.registration-success-expiry strong {
+  display: block;
+  color: #0f7f38;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.registration-success-expiry small {
+  display: block;
+  margin-top: 5px;
+  color: #839088;
+  font-size: 11px;
+}
+
+.registration-success-ok {
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #5af05d, #2fd36a);
+  color: #06170c;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(47,211,106,.22);
+  transition: transform 150ms ease, filter 150ms ease;
+}
+
+.registration-success-ok:hover {
+  filter: brightness(1.03);
+}
+
+.registration-success-ok:active {
+  transform: scale(.985);
+}
+
+@media (max-width: 600px) {
+  .registration-success-overlay {
+    padding: 14px;
+  }
+
+  .registration-success-modal {
+    padding: 25px 18px 20px;
+    border-radius: 21px;
+  }
+
+  .registration-success-icon {
+    width: 64px;
+    height: 64px;
+    font-size: 34px;
+  }
+
+  .registration-success-details > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    padding: 13px 14px;
+  }
+
+  .registration-success-expiry strong {
+    font-size: 17px;
+  }
+}
+
+/* END ADIL_REGISTRATION_SUCCESS_MODAL_V36 */
+
+
+/* ==========================================================
+   ADIL_REGISTRATION_SUCCESS_MODAL_V37
+   Admin -> Students -> Register New Student
+   ========================================================== */
+
+.registration-success-overlay-v37 {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482500;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 12, 8, .68);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.registration-success-modal-v37 {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 30px 28px 26px;
+  border: 1px solid rgba(19, 137, 64, .16);
+  border-radius: 24px;
+  background: #ffffff;
+  color: #142018;
+  text-align: center;
+  box-shadow: 0 34px 100px rgba(0, 0, 0, .38), 0 8px 26px rgba(35, 150, 77, .08);
+}
+
+.registration-success-tick-v37 {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 12px 32px rgba(22, 163, 74, .26);
+}
+
+.registration-success-modal-v37 h3 {
+  margin: 0 0 22px;
+  color: #101d15;
+  font-size: clamp(22px, 4vw, 29px);
+  line-height: 1.2;
+  letter-spacing: -.02em;
+}
+
+.registration-success-info-v37 {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.registration-success-row-v37 {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 13px 15px;
+  border: 1px solid #e6eee8;
+  border-radius: 14px;
+  background: #f8fbf9;
+  text-align: left;
+}
+
+.registration-success-row-v37 span {
+  color: #65736a;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.registration-success-row-v37 strong {
+  color: #17251c;
+  overflow-wrap: anywhere;
+}
+
+.registration-success-payid-v37 {
+  display: inline-block;
+  color: #08742f !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 15px;
+  letter-spacing: .03em;
+}
+
+.registration-success-expiry-v37 {
+  margin: 0 0 22px;
+  padding: 17px 16px;
+  border: 1px solid #dce9df;
+  border-radius: 16px;
+  background: #f5faf6;
+}
+
+.registration-success-expiry-v37 p {
+  margin: 0 0 10px;
+  color: #506058;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.registration-success-expiry-v37 strong {
+  display: block;
+  color: #126b32;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.registration-success-expiry-v37 small {
+  display: block;
+  margin-top: 5px;
+  color: #78847d;
+}
+
+.registration-success-ok-v37 {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 13px;
+  background: #159447;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(21, 148, 71, .20);
+}
+
+.registration-success-ok-v37:hover {
+  filter: brightness(.95);
+}
+
+.registration-success-ok-v37:focus-visible {
+  outline: 3px solid rgba(21, 148, 71, .24);
+  outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+  .registration-success-overlay-v37 { padding: 14px; }
+  .registration-success-modal-v37 { padding: 24px 18px 20px; border-radius: 20px; }
+  .registration-success-row-v37 { grid-template-columns: 1fr; gap: 5px; }
 }

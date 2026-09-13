@@ -4,16 +4,20 @@ import express, { Router } from "express";
 import { z } from "zod";
 import { requireDatabase } from "../../../db/client";
 import {
+  auditLogs,
   courseSections,
   courses,
   enrollments,
   lessonProgress,
+  lessonQuizAttempts,
   lessons,
   networkAccounts,
   paymentRequests,
   quizAttempts,
   quizQuestions,
-  quizzes
+  quizzes,
+  users,
+  videoAccessOverrides
 } from "../../../db/schema";
 import { HttpError, requireAuthenticatedUser, requireRole } from "../../lib/auth";
 import { asyncRoute } from "../../lib/http";
@@ -32,6 +36,141 @@ const courseInput = z.object({
   currency: z.string().trim().length(3).default("LKR"),
   isPublished: z.boolean().default(false)
 });
+
+const DAILY_NEW_LESSON_LIMIT = 3;
+const ADMIN_VIDEO_UNLOCK_MARKER = "ADIL_ADMIN_VIDEO_UNLOCK_V1";
+const LESSON_PASS_PERCENT = 75;
+
+function colomboDateKey(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(value);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+type LessonGateReason = "PAYMENT" | "DAILY_LIMIT" | "PREVIOUS_QA" | null;
+
+async function hasAllVideoUnlock(
+  db: ReturnType<typeof requireDatabase>,
+  userId: string,
+  courseId: string
+) {
+  const [override] = await db
+    .select({ unlockAllVideos: videoAccessOverrides.unlockAllVideos })
+    .from(videoAccessOverrides)
+    .where(and(eq(videoAccessOverrides.userId, userId), eq(videoAccessOverrides.courseId, courseId)))
+    .limit(1);
+  return override?.unlockAllVideos === true;
+}
+
+async function buildLessonGate(
+  db: ReturnType<typeof requireDatabase>,
+  userId: string,
+  courseId: string,
+  access: { accessLevel: "FULL" | "HALF"; halfPaymentLessonLimit: number },
+  orderedLessons?: Array<{ id: string; sectionId: string; position: number }>
+) {
+  const allVideosUnlocked = await hasAllVideoUnlock(db, userId, courseId);
+  let courseLessons = orderedLessons;
+  if (!courseLessons) {
+    const sections = await db
+      .select({ id: courseSections.id, position: courseSections.position })
+      .from(courseSections)
+      .where(eq(courseSections.courseId, courseId))
+      .orderBy(asc(courseSections.position));
+    const sectionOrder = new Map(sections.map((section, index) => [section.id, index]));
+    const unordered = sections.length
+      ? await db
+          .select({ id: lessons.id, sectionId: lessons.sectionId, position: lessons.position })
+          .from(lessons)
+          .where(inArray(lessons.sectionId, sections.map((section) => section.id)))
+          .orderBy(asc(lessons.position))
+      : [];
+    courseLessons = [...unordered].sort((a, b) =>
+      (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0) ||
+      a.position - b.position
+    );
+  }
+
+  const lessonIds = courseLessons.map((lesson) => lesson.id);
+  const attempts = lessonIds.length
+    ? await db
+        .select({
+          lessonId: lessonQuizAttempts.lessonId,
+          scorePercent: lessonQuizAttempts.scorePercent,
+          completedAt: lessonQuizAttempts.completedAt
+        })
+        .from(lessonQuizAttempts)
+        .where(and(eq(lessonQuizAttempts.userId, userId), inArray(lessonQuizAttempts.lessonId, lessonIds)))
+    : [];
+
+  const firstPassAtByLesson = new Map<string, Date>();
+  for (const attempt of attempts) {
+    if (!attempt.completedAt || (attempt.scorePercent ?? 0) < LESSON_PASS_PERCENT) continue;
+    const existing = firstPassAtByLesson.get(attempt.lessonId);
+    if (!existing || attempt.completedAt.getTime() < existing.getTime()) {
+      firstPassAtByLesson.set(attempt.lessonId, attempt.completedAt);
+    }
+  }
+  const passedLessonIds = new Set(firstPassAtByLesson.keys());
+  const todayKey = colomboDateKey(new Date());
+  const passedTodayIds = new Set(
+    [...firstPassAtByLesson.entries()]
+      .filter(([, firstPassedAt]) => colomboDateKey(firstPassedAt) === todayKey)
+      .map(([lessonId]) => lessonId)
+  );
+
+  const paymentLimit = allVideosUnlocked
+    ? courseLessons.length
+    : access.accessLevel === "FULL"
+      ? courseLessons.length
+      : Math.min(courseLessons.length, access.halfPaymentLessonLimit);
+  const firstNotPassedIndex = courseLessons.findIndex((lesson, index) =>
+    index < paymentLimit && !passedLessonIds.has(lesson.id)
+  );
+  const nextLessonIndex = firstNotPassedIndex === -1 ? paymentLimit : firstNotPassedIndex;
+  const dailyLimitReached = !allVideosUnlocked && passedTodayIds.size >= DAILY_NEW_LESSON_LIMIT;
+
+  const byLessonId = new Map<string, { locked: boolean; reason: LessonGateReason; qaPassed: boolean }>();
+  courseLessons.forEach((lesson, index) => {
+    const qaPassed = passedLessonIds.has(lesson.id);
+    if (allVideosUnlocked) {
+      byLessonId.set(lesson.id, { locked: false, reason: null, qaPassed });
+      return;
+    }
+    if (index >= paymentLimit) {
+      byLessonId.set(lesson.id, { locked: true, reason: "PAYMENT", qaPassed });
+      return;
+    }
+    if (qaPassed) {
+      byLessonId.set(lesson.id, { locked: false, reason: null, qaPassed: true });
+      return;
+    }
+    if (index === nextLessonIndex) {
+      byLessonId.set(lesson.id, {
+        locked: dailyLimitReached,
+        reason: dailyLimitReached ? "DAILY_LIMIT" : null,
+        qaPassed: false
+      });
+      return;
+    }
+    byLessonId.set(lesson.id, { locked: true, reason: "PREVIOUS_QA", qaPassed: false });
+  });
+
+  return {
+    byLessonId,
+    dailyLimit: DAILY_NEW_LESSON_LIMIT,
+    passedToday: passedTodayIds.size,
+    remainingToday: Math.max(0, DAILY_NEW_LESSON_LIMIT - passedTodayIds.size),
+    nextLessonIndex,
+    paymentLimit,
+    allVideosUnlocked
+  };
+}
 
 async function courseAccess(db: ReturnType<typeof requireDatabase>, userId: string, courseId: string) {
   const [payment] = await db.select({ status: paymentRequests.status })
@@ -64,6 +203,14 @@ const progressInput = z.object({
   lessonId: z.string().uuid(),
   elapsedSeconds: z.coerce.number().int().min(1).max(15),
   durationSeconds: z.coerce.number().int().min(10).max(86400)
+});
+
+// ADIL_RESUME_POSITION_V29
+const resumePositionInput = z.object({
+  enrollmentId: z.string().uuid(),
+  lessonId: z.string().uuid(),
+  currentTimeSeconds: z.coerce.number().min(0).max(86400),
+  durationSeconds: z.coerce.number().int().min(0).max(86400).optional()
 });
 const quizInput = z.object({
   courseId: z.string().uuid(),
@@ -275,6 +422,7 @@ courseRouter.get(
       : null;
     const lessonTitles = new Map(courseLessons.map((item) => [item.id, item.title]));
     const completedIds = new Set(completed.map((item) => item.lessonId));
+    const lessonGate = await buildLessonGate(db, user.id, enrollment.courseId, access, courseLessons);
     const modules = sections.map((section) => {
       const moduleLessons = courseLessons.filter((lesson) => lesson.sectionId === section.id);
       const moduleCompleted = moduleLessons.filter((lesson) => completedIds.has(lesson.id)).length;
@@ -285,12 +433,17 @@ courseRouter.get(
         progressPercent: moduleLessons.length
           ? Math.round((moduleCompleted / moduleLessons.length) * 100)
           : 0,
-        lessons: moduleLessons.map((lesson) => ({
-          id: lesson.id,
-          title: lesson.title,
-          locked: (lessonOrder.get(lesson.id) ?? 0) >= unlockedLimit,
-          progressPercent: progressByLesson.get(lesson.id) ?? 0
-        }))
+        lessons: moduleLessons.map((lesson) => {
+          const gate = lessonGate.byLessonId.get(lesson.id);
+          return {
+            id: lesson.id,
+            title: lesson.title,
+            locked: gate?.locked ?? true,
+            lockReason: gate?.reason ?? null,
+            qaPassed: gate?.qaPassed ?? false,
+            progressPercent: progressByLesson.get(lesson.id) ?? 0
+          };
+        })
       };
     });
     const recentActivity = [...progress].reverse().slice(0, 3).map((item) => ({
@@ -313,6 +466,10 @@ courseRouter.get(
       accessLevel: access.accessLevel,
       halfPaymentLessonLimit: access.halfPaymentLessonLimit,
       unlockedLessons: unlockedLimit,
+      dailyLessonLimit: lessonGate.dailyLimit,
+      lessonsPassedToday: lessonGate.passedToday,
+      lessonsRemainingToday: lessonGate.remainingToday,
+      allVideosUnlocked: lessonGate.allVideosUnlocked,
       modules,
       recentActivity
     });
@@ -377,7 +534,18 @@ courseRouter.get(
     );
     const lessonIndex = orderedLessons.findIndex((item) => item.id === record.lessonId);
     if (lessonIndex < 0) throw new HttpError(404, "Lesson එක course එක තුළ හමු නොවුණා.");
-    if (access.accessLevel === "HALF" && lessonIndex >= access.halfPaymentLessonLimit) {
+    const lessonGate = await buildLessonGate(db, user.id, record.courseId, access, orderedLessons);
+    if (!lessonGate.allVideosUnlocked && access.accessLevel === "HALF" && lessonIndex >= access.halfPaymentLessonLimit) {
+      throw new HttpError(403, "Balance payment approval is required to unlock this lesson.");
+    }
+    const gate = lessonGate.byLessonId.get(record.lessonId);
+    if (gate?.locked) {
+      if (gate.reason === "DAILY_LIMIT") {
+        throw new HttpError(403, "අද දින videos 3 සීමාව සම්පූර්ණයි. ඊළඟ lesson එක හෙට unlock වේ.");
+      }
+      if (gate.reason === "PREVIOUS_QA") {
+        throw new HttpError(403, "කලින් lesson එක සම්පූර්ණ කර Q & A එකෙන් 75% හෝ වැඩි score එකක් ගත් පසු මේ lesson එක unlock වේ.");
+      }
       throw new HttpError(403, "Balance payment approval is required to unlock this lesson.");
     }
 
@@ -385,6 +553,7 @@ courseRouter.get(
       .select({
         progressPercent: lessonProgress.progressPercent,
         watchedSeconds: lessonProgress.watchedSeconds,
+        resumeSeconds: lessonProgress.resumeSeconds,
         detectedDurationSeconds: lessonProgress.detectedDurationSeconds
       })
       .from(lessonProgress)
@@ -409,6 +578,7 @@ courseRouter.get(
         content: record.content,
         durationSeconds: record.durationSeconds || progress?.detectedDurationSeconds || 0,
         watchedSeconds: progress?.watchedSeconds ?? 0,
+        resumeSeconds: progress?.resumeSeconds ?? 0,
         progressPercent: progress?.progressPercent ?? 0
       }
     });
@@ -454,28 +624,38 @@ courseRouter.post(
     }
 
     const access = await courseAccess(db, user.id, enrollment.courseId);
-    if (access.accessLevel === "HALF") {
-      const sections = await db
-        .select({ id: courseSections.id })
-        .from(courseSections)
-        .where(eq(courseSections.courseId, enrollment.courseId))
-        .orderBy(asc(courseSections.position));
-      const sectionOrder = new Map(sections.map((section, index) => [section.id, index]));
-      const unorderedLessons = sections.length
-        ? await db
-            .select({ id: lessons.id, sectionId: lessons.sectionId, position: lessons.position })
-            .from(lessons)
-            .where(inArray(lessons.sectionId, sections.map((section) => section.id)))
-            .orderBy(asc(lessons.position))
-        : [];
-      const orderedLessons = [...unorderedLessons].sort((a, b) =>
-        (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0) ||
-        a.position - b.position
-      );
-      const lessonIndex = orderedLessons.findIndex((item) => item.id === input.lessonId);
-      if (lessonIndex < 0 || lessonIndex >= access.halfPaymentLessonLimit) {
-        throw new HttpError(403, "Balance payment approval is required to unlock this lesson.");
+    const sections = await db
+      .select({ id: courseSections.id, position: courseSections.position })
+      .from(courseSections)
+      .where(eq(courseSections.courseId, enrollment.courseId))
+      .orderBy(asc(courseSections.position));
+    const sectionOrder = new Map(sections.map((section, index) => [section.id, index]));
+    const unorderedLessons = sections.length
+      ? await db
+          .select({ id: lessons.id, sectionId: lessons.sectionId, position: lessons.position })
+          .from(lessons)
+          .where(inArray(lessons.sectionId, sections.map((section) => section.id)))
+          .orderBy(asc(lessons.position))
+      : [];
+    const orderedLessons = [...unorderedLessons].sort((a, b) =>
+      (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0) ||
+      a.position - b.position
+    );
+    const lessonIndex = orderedLessons.findIndex((item) => item.id === input.lessonId);
+    if (lessonIndex < 0) throw new HttpError(404, "Lesson එක course එක තුළ හමු නොවුණා.");
+    const lessonGate = await buildLessonGate(db, user.id, enrollment.courseId, access, orderedLessons);
+    if (!lessonGate.allVideosUnlocked && access.accessLevel === "HALF" && lessonIndex >= access.halfPaymentLessonLimit) {
+      throw new HttpError(403, "Balance payment approval is required to unlock this lesson.");
+    }
+    const gate = lessonGate.byLessonId.get(input.lessonId);
+    if (gate?.locked) {
+      if (gate.reason === "DAILY_LIMIT") {
+        throw new HttpError(403, "අද දින videos 3 සීමාව සම්පූර්ණයි. ඊළඟ lesson එක හෙට unlock වේ.");
       }
+      if (gate.reason === "PREVIOUS_QA") {
+        throw new HttpError(403, "කලින් lesson එකේ Q & A එකෙන් 75% හෝ වැඩි score එකක් ගත් පසු මේ lesson එක unlock වේ.");
+      }
+      throw new HttpError(403, "Balance payment approval is required to unlock this lesson.");
     }
 
     let effectiveDurationSeconds = lesson.durationSeconds > 0
@@ -561,6 +741,61 @@ courseRouter.post(
       acceptedSeconds,
       durationSeconds: effectiveDurationSeconds
     });
+  })
+);
+
+
+// ADIL_RESUME_POSITION_V29
+courseRouter.post(
+  "/student/resume-position",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const input = resumePositionInput.parse(request.body);
+    const db = requireDatabase();
+
+    const [enrollment] = await db
+      .select({ id: enrollments.id, courseId: enrollments.courseId })
+      .from(enrollments)
+      .where(and(
+        eq(enrollments.id, input.enrollmentId),
+        eq(enrollments.userId, user.id),
+        inArray(enrollments.status, ["ACTIVE", "COMPLETED"])
+      ))
+      .limit(1);
+    if (!enrollment) throw new HttpError(403, "Active enrollment required.");
+
+    const [lesson] = await db
+      .select({ id: lessons.id, courseId: courseSections.courseId, durationSeconds: lessons.durationSeconds })
+      .from(lessons)
+      .innerJoin(courseSections, eq(lessons.sectionId, courseSections.id))
+      .where(eq(lessons.id, input.lessonId))
+      .limit(1);
+    if (!lesson || lesson.courseId !== enrollment.courseId) {
+      throw new HttpError(400, "Lesson is not in this course.");
+    }
+
+    const duration = Math.max(0, lesson.durationSeconds || input.durationSeconds || 0);
+    const safePosition = Math.max(0, Math.floor(
+      duration > 0 ? Math.min(input.currentTimeSeconds, duration) : input.currentTimeSeconds
+    ));
+    const now = new Date();
+
+    const [saved] = await db
+      .insert(lessonProgress)
+      .values({
+        enrollmentId: input.enrollmentId,
+        lessonId: input.lessonId,
+        resumeSeconds: safePosition,
+        detectedDurationSeconds: duration,
+        updatedAt: now
+      })
+      .onConflictDoUpdate({
+        target: [lessonProgress.enrollmentId, lessonProgress.lessonId],
+        set: { resumeSeconds: safePosition, updatedAt: now }
+      })
+      .returning({ resumeSeconds: lessonProgress.resumeSeconds });
+
+    response.json({ resumeSeconds: saved?.resumeSeconds ?? safePosition });
   })
 );
 
@@ -727,6 +962,132 @@ courseRouter.post(
       })
       .returning();
     response.status(201).json({ course: created });
+  })
+);
+
+const adminVideoUnlockInput = z.object({
+  userId: z.string().uuid(),
+  courseId: z.string().uuid(),
+  unlocked: z.boolean()
+});
+
+courseRouter.get(
+  "/admin/video-unlock/search",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin"]);
+    const db = requireDatabase();
+    const sr = String(request.query.sr ?? "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!/^SR\d+$/.test(sr)) throw new HttpError(400, "Valid SR number එකක් type කරන්න. උදා: SR527694");
+    const numericPart = Number(sr.slice(2));
+
+    const [student] = await db
+      .select({
+        userId: users.id,
+        name: users.displayName,
+        email: users.email,
+        phone: users.phone,
+        isActive: users.isActive,
+        accountStatus: networkAccounts.status
+      })
+      .from(networkAccounts)
+      .innerJoin(users, eq(users.id, networkAccounts.ownerUserId))
+      .where(and(
+        eq(networkAccounts.prefix, "SR"),
+        eq(networkAccounts.numericPart, numericPart),
+        eq(networkAccounts.isMainAccount, true)
+      ))
+      .limit(1);
+
+    if (!student) throw new HttpError(404, "මෙම SR number එකට student account එකක් හමු නොවීය.");
+
+    const enrollmentRows = await db
+      .select({
+        courseId: courses.id,
+        courseTitle: courses.title,
+        enrollmentStatus: enrollments.status
+      })
+      .from(enrollments)
+      .innerJoin(courses, eq(courses.id, enrollments.courseId))
+      .where(eq(enrollments.userId, student.userId))
+      .orderBy(asc(enrollments.enrolledAt));
+
+    const overrideRows = await db
+      .select({ courseId: videoAccessOverrides.courseId, unlockAllVideos: videoAccessOverrides.unlockAllVideos })
+      .from(videoAccessOverrides)
+      .where(eq(videoAccessOverrides.userId, student.userId));
+    const overrideByCourse = new Map(overrideRows.map((item) => [item.courseId, item.unlockAllVideos]));
+
+    response.json({
+      student: {
+        ...student,
+        accountNumber: sr,
+        enrollments: enrollmentRows.map((item) => ({
+          ...item,
+          allVideosUnlocked: overrideByCourse.get(item.courseId) === true
+        }))
+      }
+    });
+  })
+);
+
+courseRouter.post(
+  "/admin/video-unlock",
+  asyncRoute(async (request, response) => {
+    const admin = await requireRole(request, ["admin"]);
+    const input = adminVideoUnlockInput.parse(request.body);
+    const db = requireDatabase();
+
+    const [enrollment] = await db
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(and(eq(enrollments.userId, input.userId), eq(enrollments.courseId, input.courseId)))
+      .limit(1);
+    if (!enrollment) throw new HttpError(404, "Studentට මෙම course enrollment එකක් නැහැ.");
+
+    const [account] = await db
+      .select({ numericPart: networkAccounts.numericPart })
+      .from(networkAccounts)
+      .where(and(
+        eq(networkAccounts.ownerUserId, input.userId),
+        eq(networkAccounts.prefix, "SR"),
+        eq(networkAccounts.isMainAccount, true)
+      ))
+      .limit(1);
+    if (!account) throw new HttpError(404, "Student SR account එක හමු නොවීය.");
+
+    await db
+      .insert(videoAccessOverrides)
+      .values({
+        userId: input.userId,
+        courseId: input.courseId,
+        unlockAllVideos: input.unlocked,
+        grantedBy: admin.id,
+        updatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: [videoAccessOverrides.userId, videoAccessOverrides.courseId],
+        set: {
+          unlockAllVideos: input.unlocked,
+          grantedBy: admin.id,
+          updatedAt: new Date()
+        }
+      });
+
+    await db.insert(auditLogs).values({
+      actorUserId: admin.id,
+      action: input.unlocked ? "ALL_VIDEOS_UNLOCKED" : "VIDEO_LIMITS_RESTORED",
+      entityType: "STUDENT_COURSE_ACCESS",
+      entityId: input.userId,
+      metadata: { courseId: input.courseId, accountNumber: "SR" + account.numericPart, unlocked: input.unlocked }
+    });
+
+    response.json({
+      success: true,
+      unlocked: input.unlocked,
+      message: input.unlocked
+        ? "මෙම studentට සියලු videos unlock කළා."
+        : "මෙම studentට normal Daily 3 + Q & A unlock rules නැවත enable කළා."
+    });
   })
 );
 

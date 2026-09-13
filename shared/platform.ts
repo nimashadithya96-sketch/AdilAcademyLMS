@@ -33,12 +33,23 @@ export type StudentDashboardSummary = {
   accessLevel?: "HALF" | "FULL";
   halfPaymentLessonLimit?: number;
   unlockedLessons?: number;
+  dailyLessonLimit?: number;
+  lessonsPassedToday?: number;
+  lessonsRemainingToday?: number;
+  allVideosUnlocked?: boolean;
   modules: Array<{
     title: string;
     totalLessons: number;
     completedLessons: number;
     progressPercent: number;
-    lessons?: Array<{ id: string; title: string; locked: boolean; progressPercent: number }>;
+    lessons?: Array<{
+      id: string;
+      title: string;
+      locked: boolean;
+      lockReason?: "PAYMENT" | "DAILY_LIMIT" | "PREVIOUS_QA" | null;
+      qaPassed?: boolean;
+      progressPercent: number;
+    }>;
   }>;
   recentActivity: Array<{ title: string; detail: string }>;
 };

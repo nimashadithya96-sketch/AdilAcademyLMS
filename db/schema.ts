@@ -178,6 +178,26 @@ export const enrollments = pgTable(
   ]
 );
 
+export const videoAccessOverrides = pgTable(
+  "video_access_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    unlockAllVideos: boolean("unlock_all_videos").default(true).notNull(),
+    grantedBy: uuid("granted_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [
+    uniqueIndex("video_access_overrides_user_course_unique").on(table.userId, table.courseId)
+  ]
+);
+
 export const lessonProgress = pgTable(
   "lesson_progress",
   {
@@ -190,6 +210,8 @@ export const lessonProgress = pgTable(
       .references(() => lessons.id, { onDelete: "cascade" }),
     progressPercent: integer("progress_percent").default(0).notNull(),
     watchedSeconds: integer("watched_seconds").default(0).notNull(),
+    // ADIL_RESUME_FULLSCREEN_V29: exact playback position for Resume Learning.
+    resumeSeconds: integer("resume_seconds").default(0).notNull(),
     detectedDurationSeconds: integer("detected_duration_seconds").default(0).notNull(),
     lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),

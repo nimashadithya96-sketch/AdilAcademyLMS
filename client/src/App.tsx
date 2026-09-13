@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useRef,
   useState,
@@ -151,8 +152,10 @@ function ProtectedVideoPlayer({
   watermark,
   trackingEnabled = false,
   initialWatchedSeconds = 0,
+  initialPositionSeconds = 0,
   onDurationDetected,
-  onWatchHeartbeat
+  onWatchHeartbeat,
+  onPositionChange
 }: {
   provider: string | null | undefined;
   rawValue: string | null | undefined;
@@ -160,8 +163,10 @@ function ProtectedVideoPlayer({
   watermark?: string;
   trackingEnabled?: boolean;
   initialWatchedSeconds?: number;
+  initialPositionSeconds?: number;
   onDurationDetected?: (durationSeconds: number) => void;
   onWatchHeartbeat?: (elapsedSeconds: number, durationSeconds: number) => void;
+  onPositionChange?: (currentTimeSeconds: number, durationSeconds: number, force?: boolean) => void;
 }) {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -175,8 +180,12 @@ function ProtectedVideoPlayer({
   const currentTimeRef = useRef(0);
   const furthestWatchedRef = useRef(Math.max(0, Number(initialWatchedSeconds) || 0));
 
+  // ADIL_RESUME_FULLSCREEN_V29
   const durationCallbackRef = useRef(onDurationDetected);
   const heartbeatCallbackRef = useRef(onWatchHeartbeat);
+  const positionCallbackRef = useRef(onPositionChange);
+  const initialSeekDoneRef = useRef(false);
+  const lastPositionReportRef = useRef({ at: 0, seconds: -1 });
   const trackingRef = useRef({
     lastCurrentTime: null as number | null,
     lastWallTime: 0,
@@ -189,6 +198,12 @@ function ProtectedVideoPlayer({
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsHideTimerRef = useRef<number | null>(null);
 
+  // ADIL_MOBILE_FULLSCREEN_TOGGLE_V31
+  // Native fullscreen is preferred. iOS/in-app browsers that reject the
+  // Fullscreen API fall back to a CSS viewport mode.
+  const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
+  const [nativeFullscreen, setNativeFullscreen] = useState(false);
+
   const videoUrl = buildVideoEmbedUrl(provider, rawValue);
 
   useEffect(() => {
@@ -198,6 +213,10 @@ function ProtectedVideoPlayer({
   useEffect(() => {
     heartbeatCallbackRef.current = onWatchHeartbeat;
   }, [onWatchHeartbeat]);
+
+  useEffect(() => {
+    positionCallbackRef.current = onPositionChange;
+  }, [onPositionChange]);
 
   useEffect(() => {
     const saved = Math.max(0, Number(initialWatchedSeconds) || 0);
@@ -250,6 +269,28 @@ function ProtectedVideoPlayer({
         args: [safeTarget, true]
       });
     }
+  }
+
+  function reportPlaybackPosition(force = false) {
+    const durationSeconds = Math.round(durationRef.current || 0);
+    const currentTimeSeconds = Math.max(0, currentTimeRef.current || 0);
+    if (durationSeconds <= 0) return;
+    const now = Date.now();
+    const last = lastPositionReportRef.current;
+    if (!force && now - last.at < 5000 && Math.abs(currentTimeSeconds - last.seconds) < 5) return;
+    lastPositionReportRef.current = { at: now, seconds: currentTimeSeconds };
+    positionCallbackRef.current?.(currentTimeSeconds, durationSeconds, force);
+  }
+
+  function applyInitialResumePosition() {
+    if (initialSeekDoneRef.current) return;
+    const target = Math.max(0, Number(initialPositionSeconds) || 0);
+    if (target < 1) {
+      initialSeekDoneRef.current = true;
+      return;
+    }
+    initialSeekDoneRef.current = true;
+    window.setTimeout(() => seekPlayer(target), 120);
   }
 
   function rewindTenSeconds() {
@@ -335,6 +376,7 @@ function ProtectedVideoPlayer({
     currentTimeRef.current = currentTime;
     tracker.lastCurrentTime = currentTime;
     tracker.lastWallTime = now;
+    reportPlaybackPosition(ended);
     if (ended) flushPending(true);
   }
 
@@ -361,6 +403,7 @@ function ProtectedVideoPlayer({
             postToPlayer({ method: "addEventListener", value: eventName });
           }
           postToPlayer({ method: "getDuration" });
+          applyInitialResumePosition();
           return;
         }
         if (data.method === "getDuration" && Number.isFinite(Number(data.value))) {
@@ -377,6 +420,7 @@ function ProtectedVideoPlayer({
           playingRef.current = false;
           setPlaying(false);
           flushPending(true);
+          reportPlaybackPosition(true);
           resetPlaybackSample();
           return;
         }
@@ -401,12 +445,17 @@ function ProtectedVideoPlayer({
         return;
       }
 
+      if (data.event === "onReady") {
+        applyInitialResumePosition();
+        return;
+      }
       if (data.event === "onStateChange" && Number.isFinite(Number(data.info))) {
         const state = Number(data.info);
         playingRef.current = state === 1;
         setPlaying(state === 1);
         if (state === 2 || state === 0) {
           flushPending(true);
+          reportPlaybackPosition(true);
           resetPlaybackSample();
         }
         return;
@@ -428,7 +477,10 @@ function ProtectedVideoPlayer({
     }
 
     function handleVisibilityChange() {
-      if (document.hidden) flushPending(true);
+      if (document.hidden) {
+        flushPending(true);
+        reportPlaybackPosition(true);
+      }
       resetPlaybackSample();
     }
 
@@ -449,6 +501,7 @@ function ProtectedVideoPlayer({
 
     return () => {
       flushPending(true);
+      reportPlaybackPosition(true);
       window.clearInterval(timer);
       window.removeEventListener("message", handleMessage);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -484,31 +537,153 @@ function ProtectedVideoPlayer({
     };
   }, [loaded]);
 
+  useEffect(() => {
+    function syncFullscreenState() {
+      const nativeActive =
+        document.fullscreenElement === shellRef.current ||
+        (document as any).webkitFullscreenElement === shellRef.current;
+      setNativeFullscreen(Boolean(nativeActive));
+      if (nativeActive) setPseudoFullscreen(false);
+    }
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange" as any, syncFullscreenState as EventListener);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.removeEventListener("webkitfullscreenchange" as any, syncFullscreenState as EventListener);
+    };
+  }, []);
+
   function togglePlayback() {
     if (!loaded) return;
     showControls();
     const nextPlaying = !playing;
-    if (!nextPlaying) flushPending(true);
+    if (!nextPlaying) {
+      flushPending(true);
+      reportPlaybackPosition(true);
+    }
+    // On phones/tablets, request fullscreen directly from the Play tap.
+    if (
+      nextPlaying &&
+      window.matchMedia("(max-width: 900px)").matches &&
+      !document.fullscreenElement &&
+      !(document as any).webkitFullscreenElement &&
+      !pseudoFullscreen
+    ) {
+      const shell = shellRef.current as (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> | void }) | null;
+      if (shell?.requestFullscreen) {
+        void shell.requestFullscreen().catch(() => setPseudoFullscreen(true));
+      } else if (shell?.webkitRequestFullscreen) {
+        try {
+          void shell.webkitRequestFullscreen();
+        } catch {
+          setPseudoFullscreen(true);
+        }
+      } else {
+        setPseudoFullscreen(true);
+      }
+    }
     resetPlaybackSample();
     sendPlayerCommand(nextPlaying ? "play" : "pause");
     playingRef.current = nextPlaying;
     setPlaying(nextPlaying);
   }
 
-  async function openFullscreen() {
+  async function toggleFullscreen() {
     showControls();
-    try {
-      await shellRef.current?.requestFullscreen?.();
-    } catch {
-      // Fullscreen may be blocked by the browser; normal playback remains available.
+
+    const shell = shellRef.current;
+    const frame = frameRef.current;
+    if (!shell) return;
+
+    const docAny = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+
+    const frameAny = frame as (HTMLIFrameElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    }) | null;
+
+    const shellAny = shell as HTMLDivElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    };
+
+    const activeElement =
+      document.fullscreenElement ??
+      docAny.webkitFullscreenElement ??
+      null;
+
+    // FULLSCREEN OUT
+    if (activeElement) {
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (docAny.webkitExitFullscreen) {
+          await docAny.webkitExitFullscreen();
+        }
+      } catch {
+        // Browser may reject the exit request.
+      } finally {
+        setNativeFullscreen(false);
+        setPseudoFullscreen(false);
+      }
+      return;
     }
+
+    // Exit CSS fallback if it is currently active.
+    if (pseudoFullscreen) {
+      setPseudoFullscreen(false);
+      return;
+    }
+
+    // TRUE FULLSCREEN IN:
+    // Prefer the actual video iframe. This gives mobile browsers the best
+    // chance to enter real browser fullscreen and hide URL/tool bars.
+    try {
+      if (frame?.requestFullscreen) {
+        await frame.requestFullscreen();
+        setNativeFullscreen(true);
+        setPseudoFullscreen(false);
+        return;
+      }
+
+      if (frameAny?.webkitRequestFullscreen) {
+        await frameAny.webkitRequestFullscreen();
+        setNativeFullscreen(true);
+        setPseudoFullscreen(false);
+        return;
+      }
+
+      if (shell.requestFullscreen) {
+        await shell.requestFullscreen();
+        setNativeFullscreen(true);
+        setPseudoFullscreen(false);
+        return;
+      }
+
+      if (shellAny.webkitRequestFullscreen) {
+        await shellAny.webkitRequestFullscreen();
+        setNativeFullscreen(true);
+        setPseudoFullscreen(false);
+        return;
+      }
+    } catch {
+      // Continue to fallback below.
+    }
+
+    // Some iPhone/iOS browser contexts do not permit webpage/iframe fullscreen.
+    // CSS fallback fills the viewport, but browser chrome can remain visible.
+    setNativeFullscreen(false);
+    setPseudoFullscreen(true);
   }
 
   if (!videoUrl) return null;
 
   return <div
     ref={shellRef}
-    className="protected-video-shell"
+    className={`protected-video-shell${pseudoFullscreen ? " protected-video-shell-pseudo-fullscreen" : ""}`}
     onContextMenu={(event) => event.preventDefault()}
     onDragStart={(event) => event.preventDefault()}
     onPointerDown={() => showControls()}
@@ -520,7 +695,7 @@ function ProtectedVideoPlayer({
       ref={frameRef}
       src={videoUrl}
       title={title}
-      allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
+      allow="autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
       referrerPolicy="strict-origin-when-cross-origin"
       allowFullScreen
       tabIndex={-1}
@@ -534,20 +709,34 @@ function ProtectedVideoPlayer({
             postToPlayer({ event: "listening" });
             postToPlayer({ event: "command", func: "getDuration", args: [] });
           }
+          applyInitialResumePosition();
         }, 350);
       }}
     />
     <span className="protected-video-watermark">{watermark ?? "ADIL ACADEMY • STUDENT ACCESS"}</span>
-    {!playing && <button
+    <button
       type="button"
-      className="protected-video-start"
-      onClick={togglePlayback}
+      className="protected-video-tap-layer"
+      onClick={() => showControls()}
+      aria-label="Show video controls"
+      tabIndex={-1}
+    />
+
+    <button
+      type="button"
+      className={`protected-video-center-toggle${controlsVisible ? " is-visible" : ""}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        togglePlayback();
+      }}
       disabled={!loaded}
-      aria-label={loaded ? "Play lesson video" : "Video loading"}
+      aria-label={playing ? "Pause video" : "Play video"}
+      title={playing ? "Pause" : "Play"}
     >
-      <Play size={30} />
-      <span>{loaded ? "පාඩම ආරම්භ කරන්න" : "Video loading..."}</span>
-    </button>}
+      {playing
+        ? <Pause size={34} strokeWidth={2.2} />
+        : <Play size={34} strokeWidth={2.2} fill="currentColor" />}
+    </button>
     <div
       className="protected-video-controls"
       style={{
@@ -560,15 +749,6 @@ function ProtectedVideoPlayer({
         showControls();
       }}
     >
-      <button
-        type="button"
-        onClick={togglePlayback}
-        disabled={!loaded}
-        aria-label={playing ? "Pause video" : "Play video"}
-      >
-        {playing ? <Pause size={18} /> : <Play size={18} />}
-      </button>
-
       <button
         type="button"
         onClick={rewindTenSeconds}
@@ -589,17 +769,24 @@ function ProtectedVideoPlayer({
         ↺ Start
       </button>
 
-      <span>
+      <span className="protected-video-tracking-label">
         <ShieldCheck size={14} />
         {trackingEnabled ? "WATCH TIME AUTO TRACKING" : "ADIL ACADEMY SECURE PLAYER"}
       </span>
 
       <button
         type="button"
-        onClick={() => void openFullscreen()}
-        aria-label="Open fullscreen"
+        onClick={() => void toggleFullscreen()}
+        aria-label={(nativeFullscreen || pseudoFullscreen) ? "Exit fullscreen" : "Open fullscreen"}
+        title={(nativeFullscreen || pseudoFullscreen) ? "Fullscreen ඉවත් කරන්න" : "Fullscreen කරන්න"}
       >
-        <Maximize2 size={18} />
+        <Maximize2
+          size={18}
+          style={{
+            transform: (nativeFullscreen || pseudoFullscreen) ? "rotate(180deg) scale(0.92)" : "none",
+            transition: "transform 160ms ease"
+          }}
+        />
       </button>
     </div>
   </div>;
@@ -1859,6 +2046,11 @@ function StudentDashboard({ onOpen }: { onOpen: (module: string) => void }) {
 
     if (resumeLesson) {
       window.sessionStorage.setItem("adil-resume-lesson-id", resumeLesson.id);
+      window.sessionStorage.setItem("adil-resume-fullscreen", "1");
+    }
+    // Preserve the mobile user gesture so the My Course player can open inside fullscreen.
+    if (window.matchMedia("(max-width: 900px)").matches && !document.fullscreenElement) {
+      void document.documentElement.requestFullscreen?.().catch(() => undefined);
     }
     onOpen("My Course");
   }
@@ -2806,11 +2998,11 @@ function StudentQAndAWorkspace() {
   if (loading) return <section className="dash-card workspace-card"><h3>Q & A loading...</h3></section>;
 
   return <section className="dash-card workspace-card qa-workspace">
-    <div className="workspace-heading"><div><span className="eyebrow">SINHALA KNOWLEDGE CHECK</span><h2>Q & A</h2><p>ඔබ අවසන් කළ පාඩම්වල දැනුම පරීක්ෂා කරන්න. සෑම පිළිතුරක්ම පළමු වරට තෝරාගත් පසු lock වේ.</p></div></div>
+    <div className="workspace-heading"><div><span className="eyebrow">SINHALA KNOWLEDGE CHECK</span><h2>Q & A</h2><p>Video පාඩම අවම 80%ක් නැරඹූ පසු එහි Q & A විවෘත වේ. සෑම පිළිතුරක්ම පළමු වරට තෝරාගත් පසු lock වේ.</p></div></div>
     {message && <p className="form-error">{message}</p>}
     <div className="qa-layout">
-      <aside className="qa-catalog" aria-label="Completed lesson quizzes">
-        {!catalog.courses.length && <div className="workspace-note"><strong>තවම Q & A නැහැ.</strong><p>Lesson එක 100% අවසන් කළ පසු එහි quiz මෙහි පෙන්වයි.</p></div>}
+      <aside className="qa-catalog" aria-label="80 percent watched lesson quizzes">
+        {!catalog.courses.length && <div className="workspace-note"><strong>තවම Q & A නැහැ.</strong><p>Lesson video එක අවම 80%ක් නැරඹූ පසු එහි Q & A මෙහි පෙන්වයි.</p></div>}
         {catalog.courses.map((course) => <div key={course.id} className="qa-course">
           <h3>{course.title}</h3>
           {course.modules.map((module) => <div key={module.id} className="qa-module">
@@ -2824,7 +3016,7 @@ function StudentQAndAWorkspace() {
       </aside>
 
       <div className="qa-main">
-        {!detail && <div className="qa-empty"><Target /><h3>අවසන් කළ පාඩමක් තෝරන්න</h3><p>එම video පාඩමට අදාළ සිංහල ප්‍රශ්න මෙහි විවෘත වේ.</p></div>}
+        {!detail && <div className="qa-empty"><Target /><h3>80%ක් හෝ වැඩි නැරඹූ පාඩමක් තෝරන්න</h3><p>එම video පාඩමට අදාළ සිංහල ප්‍රශ්න මෙහි විවෘත වේ.</p></div>}
         {detail && <>
           <div className="qa-lesson-heading"><div><span className="eyebrow">{detail.lesson.moduleTitle}</span><h3>{detail.lesson.title}</h3><p>{detail.lesson.courseTitle} · {detail.questions.length} ප්‍රශ්න</p></div>{detail.attempt && <span className="status-badge success">Attempt {detail.attempt.attemptNumber}</span>}</div>
           {!detail.questions.length && <div className="workspace-note"><strong>මෙම පාඩමට ප්‍රශ්න තවම publish කර නැහැ.</strong><p>Admin Course panel එකෙන් Sinhala questions එකතු කළ හැක.</p></div>}
@@ -2859,7 +3051,7 @@ function StudentQAndAWorkspace() {
           </div>}
 
           {completed && <div className={`qa-result-banner qa-result-${resultBand}`}>
-            <span className="qa-emoji" aria-hidden="true">{resultEmoji}</span><div><span>මෙම පාඩමේ දැනුම් මට්ටම</span><strong>{score}%</strong><p>{score < 50 ? "Video පාඩම නැවත හොඳින් බලන්න." : score < 75 ? "හොඳ උත්සාහයක් — තවත් ටිකක් පුහුණු වෙමු." : "විශිෂ්ටයි! පාඩම හොඳින් අවබෝධ කරගෙන ඇත."}</p></div>
+            <span className="qa-emoji" aria-hidden="true">{resultEmoji}</span><div><span>මෙම පාඩමේ දැනුම් මට්ටම</span><strong>{score}%</strong><p>{score < 50 ? "Video පාඩම නැවත හොඳින් බලන්න." : score < 75 ? "75% pass mark එකට තවත් ටිකක් අවශ්‍යයි. Video එක නැවත බලලා retake කරන්න." : "Pass! 75%+ ලැබුණා. Daily limit එක ඇතුළේ නම් ඊළඟ lesson එක unlock වේ."}</p></div>
           </div>}
 
           {completed && <div className="qa-rewatch">
@@ -2896,6 +3088,7 @@ type StudentLessonDetail = {
     content: string | null;
     durationSeconds: number;
     watchedSeconds: number;
+    resumeSeconds: number;
     progressPercent: number;
   };
 };
@@ -2933,6 +3126,7 @@ function StudentCourseWorkspace({
   const [loadingLesson, setLoadingLesson] = useState(false);
   const [syncingProgress, setSyncingProgress] = useState(false);
   const [message, setMessage] = useState("");
+  const [isMobileCourseLayout, setIsMobileCourseLayout] = useState(false);
   const detailRef = useRef<StudentLessonDetail | null>(null);
   const activeLessonIdRef = useRef("");
   const queuedWatchSecondsRef = useRef(0);
@@ -2953,6 +3147,14 @@ function StudentCourseWorkspace({
     detailRef.current = detail;
   }, [detail]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 900px)");
+    const syncLayout = () => setIsMobileCourseLayout(media.matches);
+    syncLayout();
+    media.addEventListener?.("change", syncLayout);
+    return () => media.removeEventListener?.("change", syncLayout);
+  }, []);
+
   async function openLesson(lessonId: string) {
     window.sessionStorage.removeItem("adil-resume-lesson-id");
     activeLessonIdRef.current = lessonId;
@@ -2971,6 +3173,9 @@ function StudentCourseWorkspace({
       detectedDurationRef.current = data.lesson.durationSeconds;
       detailRef.current = data;
       setDetail(data);
+      if (window.sessionStorage.getItem("adil-resume-fullscreen") === "1") {
+        window.sessionStorage.removeItem("adil-resume-fullscreen");
+      }
     }
     setLoadingLesson(false);
   }
@@ -3076,6 +3281,35 @@ function StudentCourseWorkspace({
     void flushProgressQueue();
   }
 
+  async function handlePlaybackPosition(currentTimeSeconds: number, durationSeconds: number) {
+    const currentDetail = detailRef.current;
+    const lessonId = activeLessonIdRef.current;
+    if (!currentDetail || currentDetail.lesson.id !== lessonId || durationSeconds <= 0) return;
+    try {
+      const response = await fetch("/api/student/resume-position", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          enrollmentId: currentDetail.enrollmentId,
+          lessonId,
+          currentTimeSeconds: Math.max(0, Math.floor(currentTimeSeconds)),
+          durationSeconds: Math.max(0, Math.round(durationSeconds))
+        })
+      });
+      if (response.ok) {
+        const nextDetail = {
+          ...currentDetail,
+          lesson: { ...currentDetail.lesson, resumeSeconds: Math.max(0, Math.floor(currentTimeSeconds)) }
+        };
+        detailRef.current = nextDetail;
+        setDetail(nextDetail);
+      }
+    } catch {
+      // Resume position is best-effort; normal watch progress continues independently.
+    }
+  }
+
   function handleDurationDetected(durationSeconds: number) {
     detectedDurationRef.current = durationSeconds;
     const currentDetail = detailRef.current;
@@ -3091,6 +3325,61 @@ function StudentCourseWorkspace({
   const videoUrl = buildVideoEmbedUrl(detail?.lesson.videoProvider, detail?.lesson.videoId);
   const durationSeconds = detail?.lesson.durationSeconds ?? 0;
   const watchedSeconds = detail?.lesson.watchedSeconds ?? 0;
+
+  function renderLessonPlayer() {
+    return <div className="student-course-player">
+      {loadingLesson ? <div className="qa-empty"><BookOpen size={36} /><h3>Lesson loading...</h3></div> : !detail ? <div className="qa-empty"><Play size={38} /><h3>Lesson එකක් තෝරන්න</h3><p>Unlocked lesson එක click කරන්න.</p></div> : <>
+        <div className="student-course-player-heading">
+          <div>
+            <span className="eyebrow">{detail.lesson.moduleTitle}</span>
+            <h3>{detail.lesson.title}</h3>
+            <p>{durationSeconds ? `Video duration: ${formatWatchTime(durationSeconds)}` : "Video play කළ පසු duration එක automatically හඳුනාගනී."}</p>
+          </div>
+          <span className={`status-badge ${detail.lesson.progressPercent === 100 ? "success" : "warning"}`}>
+            {detail.lesson.progressPercent === 100 ? "COMPLETED" : "IN PROGRESS"}
+          </span>
+        </div>
+
+        {videoUrl ? <ProtectedVideoPlayer
+          key={detail.lesson.id}
+          provider={detail.lesson.videoProvider}
+          rawValue={detail.lesson.videoId}
+          title={`${detail.lesson.title} video`}
+          watermark={summary.accountNumber ? `ADIL ACADEMY • ${summary.accountNumber}` : "ADIL ACADEMY • STUDENT ACCESS"}
+          trackingEnabled={detail.lesson.progressPercent < 100}
+          initialWatchedSeconds={detail.lesson.watchedSeconds}
+          initialPositionSeconds={detail.lesson.resumeSeconds}
+          onDurationDetected={handleDurationDetected}
+          onWatchHeartbeat={handleWatchHeartbeat}
+          onPositionChange={handlePlaybackPosition}
+        /> : <div className="workspace-note">
+          <strong>Video link එක හඳුනාගත නොහැක.</strong>
+          <p>Admin panel එකේ YouTube/Vimeo URL එක හෝ Video ID එක නිවැරදිව add කරන්න.</p>
+        </div>}
+
+        {detail.lesson.content && <div className="student-lesson-note">
+          <span className="eyebrow">LESSON NOTE</span>
+          <p>{detail.lesson.content}</p>
+        </div>}
+
+        <div className="student-lesson-progress">
+          <div>
+            <span>Lesson progress</span>
+            <strong>{detail.lesson.progressPercent}%</strong>
+          </div>
+          <div className="progress-track large"><span style={{ width: `${detail.lesson.progressPercent}%` }} /></div>
+          <div className="automatic-progress-note">
+            <ShieldCheck size={17} />
+            <div>
+              <strong>{detail.lesson.progressPercent === 100 ? "Lesson automatically completed" : "Watch time automatically tracking"}</strong>
+              <span>{formatWatchTime(Math.min(watchedSeconds, durationSeconds || watchedSeconds))} / {durationSeconds ? formatWatchTime(durationSeconds) : "Detecting..."} watched{syncingProgress ? " · Saving..." : ""}</span>
+              <small>Video play වන සැබෑ කාලය පමණක් count වේ. Video pause කළ විට හෝ වෙනත් tab එකකට ගිය විට progress එක වැඩි නොවේ.</small>
+            </div>
+          </div>
+        </div>
+      </>}
+    </div>;
+  }
 
   return <section className="dash-card workspace-card student-course-workspace">
     <div className="workspace-heading">
@@ -3116,76 +3405,29 @@ function StudentCourseWorkspace({
             <small>{module.completedLessons}/{module.totalLessons} completed</small>
           </div>
           <div className="student-course-lessons">
-            {(module.lessons ?? []).map((lesson, lessonIndex) => <button
-              type="button"
-              key={lesson.id}
-              className={`${selectedLessonId === lesson.id ? "active" : ""} ${lesson.locked ? "locked" : ""}`}
-              disabled={lesson.locked}
-              onClick={() => void openLesson(lesson.id)}
-            >
-              <span className="student-course-lesson-icon">
-                {lesson.locked ? <LockKeyhole size={15} /> : lesson.progressPercent === 100 ? <Check size={15} /> : <Play size={15} />}
-              </span>
-              <span>
-                <b>{lessonIndex + 1}. {lesson.title}</b>
-                <small>{lesson.locked ? "Balance payment required" : lesson.progressPercent === 100 ? "Completed" : lesson.progressPercent ? `${lesson.progressPercent}% watched` : "Ready to watch"}</small>
-              </span>
-              <ChevronRight size={15} />
-            </button>)}
+            {(module.lessons ?? []).map((lesson, lessonIndex) => <Fragment key={lesson.id}>
+              <button
+                type="button"
+                className={`${selectedLessonId === lesson.id ? "active" : ""} ${lesson.locked ? "locked" : ""}`}
+                disabled={lesson.locked}
+                onClick={() => void openLesson(lesson.id)}
+              >
+                <span className="student-course-lesson-icon">
+                  {lesson.locked ? <LockKeyhole size={15} /> : lesson.progressPercent === 100 ? <Check size={15} /> : <Play size={15} />}
+                </span>
+                <span>
+                  <b>{lessonIndex + 1}. {lesson.title}</b>
+                  <small>{lesson.locked ? "Balance payment required" : lesson.progressPercent === 100 ? "Completed" : lesson.progressPercent ? `${lesson.progressPercent}% watched` : "Ready to watch"}</small>
+                </span>
+                <ChevronRight size={15} />
+              </button>
+              {isMobileCourseLayout && selectedLessonId === lesson.id && <div className="student-course-inline-player">{renderLessonPlayer()}</div>}
+            </Fragment>)}
           </div>
         </div>)}
       </aside>
 
-      <div className="student-course-player">
-        {loadingLesson ? <div className="qa-empty"><BookOpen size={36} /><h3>Lesson loading...</h3></div> : !detail ? <div className="qa-empty"><Play size={38} /><h3>Lesson එකක් තෝරන්න</h3><p>වම් පැත්තේ unlocked lesson එක click කරන්න.</p></div> : <>
-          <div className="student-course-player-heading">
-            <div>
-              <span className="eyebrow">{detail.lesson.moduleTitle}</span>
-              <h3>{detail.lesson.title}</h3>
-              <p>{durationSeconds ? `Video duration: ${formatWatchTime(durationSeconds)}` : "Video play කළ පසු duration එක automatically හඳුනාගනී."}</p>
-            </div>
-            <span className={`status-badge ${detail.lesson.progressPercent === 100 ? "success" : "warning"}`}>
-              {detail.lesson.progressPercent === 100 ? "COMPLETED" : "IN PROGRESS"}
-            </span>
-          </div>
-
-          {videoUrl ? <ProtectedVideoPlayer
-            key={detail.lesson.id}
-            provider={detail.lesson.videoProvider}
-            rawValue={detail.lesson.videoId}
-            title={`${detail.lesson.title} video`}
-            watermark={summary.accountNumber ? `ADIL ACADEMY • ${summary.accountNumber}` : "ADIL ACADEMY • STUDENT ACCESS"}
-            trackingEnabled={detail.lesson.progressPercent < 100}
-            initialWatchedSeconds={watchedSeconds}
-            onDurationDetected={handleDurationDetected}
-            onWatchHeartbeat={handleWatchHeartbeat}
-          /> : <div className="workspace-note">
-            <strong>Video link එක හඳුනාගත නොහැක.</strong>
-            <p>Admin panel එකේ YouTube/Vimeo URL එක හෝ Video ID එක නිවැරදිව add කරන්න.</p>
-          </div>}
-
-          {detail.lesson.content && <div className="student-lesson-note">
-            <span className="eyebrow">LESSON NOTE</span>
-            <p>{detail.lesson.content}</p>
-          </div>}
-
-          <div className="student-lesson-progress">
-            <div>
-              <span>Lesson progress</span>
-              <strong>{detail.lesson.progressPercent}%</strong>
-            </div>
-            <div className="progress-track large"><span style={{ width: `${detail.lesson.progressPercent}%` }} /></div>
-            <div className="automatic-progress-note">
-              <ShieldCheck size={17} />
-              <div>
-                <strong>{detail.lesson.progressPercent === 100 ? "Lesson automatically completed" : "Watch time automatically tracking"}</strong>
-                <span>{formatWatchTime(Math.min(watchedSeconds, durationSeconds || watchedSeconds))} / {durationSeconds ? formatWatchTime(durationSeconds) : "Detecting..."} watched{syncingProgress ? " · Saving..." : ""}</span>
-                <small>Video play වන සැබෑ කාලය පමණක් count වේ. Video pause කළ විට හෝ වෙනත් tab එකකට ගිය විට progress එක වැඩි නොවේ.</small>
-              </div>
-            </div>
-          </div>
-        </>}
-      </div>
+      {!isMobileCourseLayout && renderLessonPlayer()}
     </div>}
     {message && <p className={message.includes("automatically Completed") ? "workspace-note" : "form-error"}>{message}</p>}
   </section>;
@@ -3214,7 +3456,7 @@ function StudentFeatureWorkspace({ module }: { module: string }) {
       setPayments(paymentData.payments);
       setCertificates(certificateData.certificates);
     }).catch(() => setFailed(true)).finally(() => setLoading(false));
-  }, []);
+  }, [module]);
 
   if (module === "Q & A") return <StudentQAndAWorkspace />;
   if (module === "Balance Payment") return <StudentBalancePaymentWorkspace />;
@@ -3500,6 +3742,88 @@ function LessonQuizManager({ courses }: { courses: AdminCourseView[] }) {
   </section>;
 }
 
+type AdminVideoUnlockStudent = {
+  userId: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  isActive: boolean;
+  accountStatus: string;
+  accountNumber: string;
+  enrollments: Array<{
+    courseId: string;
+    courseTitle: string;
+    enrollmentStatus: string;
+    allVideosUnlocked: boolean;
+  }>;
+};
+
+function AdminVideoUnlockManager() {
+  const [sr, setSr] = useState("");
+  const [student, setStudent] = useState<AdminVideoUnlockStudent | null>(null);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function searchStudent(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const query = sr.trim().toUpperCase().replace(/\s+/g, "");
+    if (!query) return;
+    setLoading(true);
+    setMessage("");
+    setStudent(null);
+    const response = await fetch("/api/admin/video-unlock/search?sr=" + encodeURIComponent(query));
+    const data = await response.json().catch(() => ({})) as { student?: AdminVideoUnlockStudent; message?: string };
+    if (!response.ok || !data.student) setMessage(data.message ?? "Student search failed.");
+    else { setStudent(data.student); setSr(data.student.accountNumber); }
+    setLoading(false);
+  }
+
+  async function setUnlock(courseId: string, unlocked: boolean) {
+    if (!student) return;
+    const action = unlocked ? "සියලු videos unlock" : "normal Daily 3 + Q & A limits නැවත enable";
+    if (!window.confirm(student.accountNumber + " • " + student.name + " සඳහා " + action + " කරන්නද?")) return;
+    setLoading(true);
+    setMessage("");
+    const response = await fetch("/api/admin/video-unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: student.userId, courseId, unlocked })
+    });
+    const data = await response.json().catch(() => ({})) as { message?: string };
+    setMessage(data.message ?? (response.ok ? "Access updated." : "Access update failed."));
+    setLoading(false);
+    if (response.ok) await searchStudent();
+  }
+
+  return <section className="video-unlock-admin">
+    <div className="video-unlock-heading">
+      <div><span className="eyebrow">STUDENT VIDEO ACCESS</span><h3>Videos Unlock</h3><p>SR number එකෙන් student හොයලා, අවශ්‍ය නම් එයාට විතරක් Daily 3 සහ Q & A sequence limits bypass කර සියලු course videos unlock කරන්න.</p></div>
+      <span className="video-unlock-shield"><LockKeyhole size={22} /></span>
+    </div>
+    <form className="video-unlock-search" onSubmit={searchStudent}>
+      <input value={sr} onChange={(event) => setSr(event.target.value)} placeholder="SR number එක type කරන්න — උදා: SR527694" aria-label="Student SR number" />
+      <button className="button button-primary" type="submit" disabled={loading}>{loading ? "Searching..." : "Search Student"}</button>
+    </form>
+    {message && <p className="video-unlock-message">{message}</p>}
+    {student && <div className="video-unlock-student">
+      <div className="video-unlock-person">
+        <div><small>STUDENT</small><strong>{student.name}</strong><span>{student.email}{student.phone ? " • " + student.phone : ""}</span></div>
+        <div><small>SR ACCOUNT</small><strong>{student.accountNumber}</strong><span>{student.isActive ? "Active login" : "Inactive login"} • {student.accountStatus}</span></div>
+      </div>
+      {!student.enrollments.length && <div className="workspace-note"><strong>Course enrollment එකක් හමු නොවීය.</strong></div>}
+      {student.enrollments.map((enrollment) => <div className="video-unlock-course" key={enrollment.courseId}>
+        <div><small>COURSE</small><strong>{enrollment.courseTitle}</strong><span>{enrollment.enrollmentStatus}</span></div>
+        <div className={enrollment.allVideosUnlocked ? "video-unlock-status unlocked" : "video-unlock-status normal"}>
+          {enrollment.allVideosUnlocked ? "ALL VIDEOS UNLOCKED" : "NORMAL DAILY LIMIT"}
+        </div>
+        {enrollment.allVideosUnlocked
+          ? <button type="button" className="button button-ghost" disabled={loading} onClick={() => void setUnlock(enrollment.courseId, false)}>Use Normal Limits</button>
+          : <button type="button" className="button button-primary" disabled={loading} onClick={() => void setUnlock(enrollment.courseId, true)}>Unlock All Videos</button>}
+      </div>)}
+    </div>}
+  </section>;
+}
+
 function CourseManagementWorkspace() {
   const [courses, setCourses] = useState<AdminCourseView[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState("");
@@ -3646,6 +3970,7 @@ function CourseManagementWorkspace() {
   if (!course && !courses.length) return <section className="dash-card workspace-card"><h3>Course data loading...</h3></section>;
   return <section className="dash-card workspace-card course-manager">
     <div className="workspace-heading"><div><span className="eyebrow">MULTI-COURSE MANAGEMENT</span><h2>Courses, Photos & Lessons</h2><p>Course name එක type කර photo එකක් සමඟ add කළාම Home page සහ Admission form එකට ස්වයංක්‍රීයව එකතු වේ.</p></div></div>
+    <AdminVideoUnlockManager />
     {message && <p className="form-error">{message}</p>}
     <form className="course-create-card" onSubmit={createCourse}>
       <div><span className="eyebrow">ADD A NEW COURSE</span><h3>නව පාඨමාලාවක් එකතු කරන්න</h3></div>
@@ -4230,6 +4555,11 @@ function AdminStudentRegistrationWorkspace({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [registrationSuccess, setRegistrationSuccess] = useState<{
+    studentName: string;
+    payId: string;
+    expiresAt: string;
+  } | null>(null);
   const [withoutNic, setWithoutNic] = useState(false);
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
@@ -4271,9 +4601,23 @@ function AdminStudentRegistrationWorkspace({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const data = await response.json().catch(() => ({})) as { message?: string; payId?: string };
+    const data = await response.json().catch(() => ({})) as {
+      message?: string;
+      payId?: string;
+      expiresAt?: string;
+    };
     if (response.ok) {
-      setMessage(`Registration saved. ${data.payId ?? "Pay ID"} studentගේ email එකට යවා ඇත.`);
+      const firstName = String(form.get("firstName") ?? "").trim();
+      const lastName = String(form.get("lastName") ?? "").trim();
+      const studentName = [firstName, lastName].filter(Boolean).join(" ") || "Student";
+
+      setMessage("");
+      setRegistrationSuccess({
+        studentName,
+        payId: String(data.payId ?? "").trim() || "Pay ID generated",
+        expiresAt: String(data.expiresAt ?? "").trim()
+      });
+
       await onCreated();
     } else {
       setError(data.message ?? `Registration failed (HTTP ${response.status}).`);
@@ -4281,11 +4625,109 @@ function AdminStudentRegistrationWorkspace({
     setBusy(false);
   }
 
+  function formatRegistrationExpiry(value: string) {
+    if (!value) return "48 hours from registration";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat("en-LK", {
+      timeZone: "Asia/Colombo",
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    }).format(date);
+  }
+
   return <section className="dash-card workspace-card consultant-registration admin-student-registration">
     <div className="workspace-heading">
       <div><span className="eyebrow">ADMIN • STUDENT ONBOARDING</span><h2>Register New Student</h2><p>Academy Direct admission එකක් හෝ consultant CN placement එකක් ලෙස student register කරන්න.</p></div>
       <button type="button" className="button button-secondary" onClick={onClose}>Back to Students</button>
     </div>
+
+    {registrationSuccess && <div
+      className="registration-success-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="registration-success-title"
+    >
+      <div className="registration-success-modal">
+        <div className="registration-success-icon" aria-hidden="true">✓</div>
+
+        <h3 id="registration-success-title">Student Registration Successful!</h3>
+
+        <div className="registration-success-details">
+          <div>
+            <span>Student Name</span>
+            <strong>{registrationSuccess.studentName}</strong>
+          </div>
+          <div>
+            <span>Pay ID</span>
+            <strong className="registration-success-payid">{registrationSuccess.payId}</strong>
+          </div>
+        </div>
+
+        <div className="registration-success-expiry">
+          <p>The student registration will expire if payment is not made by the student on or before:</p>
+          <strong>{formatRegistrationExpiry(registrationSuccess.expiresAt)}</strong>
+          <small>Sri Lanka Time (Asia/Colombo)</small>
+        </div>
+
+        <button
+          type="button"
+          className="registration-success-ok"
+          onClick={() => setRegistrationSuccess(null)}
+          autoFocus
+        >
+          OK
+        </button>
+      </div>
+    </div>}
+
+    {registrationSuccess && <div
+      className="registration-success-overlay-v37"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="registration-success-title-v37"
+    >
+      <div className="registration-success-modal-v37">
+        <div className="registration-success-tick-v37" aria-hidden="true">✓</div>
+
+        <h3 id="registration-success-title-v37">Student Registration Successful!</h3>
+
+        <div className="registration-success-info-v37">
+          <div className="registration-success-row-v37">
+            <span>Student Name</span>
+            <strong>{registrationSuccess.studentName}</strong>
+          </div>
+
+          <div className="registration-success-row-v37">
+            <span>Pay ID</span>
+            <strong className="registration-success-payid-v37">{registrationSuccess.payId}</strong>
+          </div>
+        </div>
+
+        <div className="registration-success-expiry-v37">
+          <p>The student registration will expire if payment is not made by the student on or before:</p>
+          <strong>{formatRegistrationExpiry(registrationSuccess.expiresAt)}</strong>
+          <small>Sri Lanka Time (Asia/Colombo)</small>
+        </div>
+
+        <button
+          type="button"
+          className="registration-success-ok-v37"
+          onClick={() => {
+            setRegistrationSuccess(null);
+            void onCreated();
+          }}
+          autoFocus
+        >
+          OK
+        </button>
+      </div>
+    </div>}
+
     {loading && <p className="registration-note">Courses සහ active consultant accounts load වෙමින් පවතී...</p>}
     {message && <p className="form-success">{message}</p>}{error && <p className="form-error">{error}</p>}
     {!loading && <form className="consultant-registration-form" onSubmit={submit}>

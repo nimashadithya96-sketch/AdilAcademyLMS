@@ -1,0 +1,262 @@
+Update the existing **Student Accounts → My Course** section of the Adil Academy LMS.
+
+IMPORTANT:
+
+* Do NOT rebuild the application from scratch.
+* Do NOT change the existing design, database structure, authentication, routing, desktop functionality, or unrelated features.
+* Keep all existing functionality working.
+* Only make the changes/fixes described below.
+* Make the UI fully responsive, especially for mobile devices.
+* After making the changes, test the complete user flow and fix any related bugs you find.
+
+## 1. MY COURSE – MOBILE VIDEO LIST POSITION FIX
+
+There is currently a problem in the mobile version of:
+
+**Student Dashboard → My Course**
+
+When a student opens/selects a particular video/topic, the video list does not scroll to the selected video correctly. Instead, the list often shows the first/top video at the bottom of the visible area.
+
+FIX THIS:
+
+* When the student taps/selects a specific video from the video list, that selected video must automatically become visible in the correct position.
+* The selected video/topic should be positioned **below the relevant topic/section heading**, so the student can immediately see the selected video and its surrounding videos.
+* Do not always show the first video.
+* The scroll position must be calculated based on the actual selected video element.
+* This must work correctly on mobile screens of different sizes.
+* Avoid unwanted jumps or incorrect scroll positions.
+
+## 2. MOBILE VIDEO PLAYER – PAUSE/STOP CONTROL
+
+When a student is watching a video:
+
+* When the student taps once on the middle of the video player, the video player controls must appear.
+* The **Pause/Play control** must be clearly accessible.
+* When the video is playing and the student taps the pause/stop button, the video must actually pause at the exact current timestamp.
+* When the student taps play again, playback should continue from the exact paused timestamp.
+* Do not restart the video from the beginning.
+* Make sure this works correctly on mobile/touch devices.
+
+## 3. MOBILE VIDEO PLAYER – BACK BUTTON
+
+Add a clear **Back** button on the video player screen.
+
+Expected behavior:
+
+* The Back button should be located over/above the video player in a mobile-friendly position.
+
+* The Back button should allow the student to leave the currently opened video and return to the previous My Course/video-list view.
+
+* The Back button should NOT appear permanently over the video if that conflicts with the existing player UI.
+
+* The Back button should become accessible when the student taps the video/player area once to show the player controls.
+
+* Therefore, the intended interaction is:
+
+  1. Student watches video.
+  2. Student taps the video once.
+  3. Video controls and Back button become visible.
+  4. Student taps Back.
+  5. Student returns to the previous video list/course view.
+
+* Make sure the Back button works correctly with browser/mobile navigation and does not unnecessarily reload the entire page.
+
+* Preserve the student's current course/video state when returning.
+
+## 4. MOST IMPORTANT – "YOUR COURSE / CONTINUE LEARNING" RESUME FIX
+
+On the Student Dashboard there is a section/button:
+
+**"YOUR COURSE"**
+
+and:
+
+**"ඔබ නතර කළ තැනින් ඉගෙනීම දිගටම කරගෙන යන්න"**
+
+This feature MUST work as a real video resume system.
+
+CURRENT PROBLEM:
+When a student watches a video, leaves/back-navigates from the video, and later clicks:
+
+**YOUR COURSE → ඔබ නතර කළ තැනින් ඉගෙනීම දිගටම කරගෙන යන්න**
+
+the system does NOT reliably load the video from the exact position where the student stopped watching.
+
+FIX THIS COMPLETELY.
+
+### Required behavior:
+
+If a student watches a video until, for example, 12 minutes 35 seconds and then leaves the video:
+
+* Save the exact playback position/time continuously while the video is playing.
+* Save the position when the student pauses.
+* Save the position when the student leaves/back-navigates from the video.
+* Also save the position when the video/page is being unloaded or navigated away from, where technically possible.
+* The saved position must be associated with the correct:
+
+  * student account
+  * course
+  * video
+  * lesson/topic
+
+When the student later clicks:
+
+**YOUR COURSE → ඔබ නතර කළ තැනින් ඉගෙනීම දිගටම කරගෙන යන්න**
+
+the system MUST:
+
+1. Identify the exact last-watched video.
+2. Open that exact video.
+3. Wait until the video metadata/player is ready.
+4. Seek to the exact previously saved playback position.
+5. Start/show the video at that saved position.
+
+Example:
+
+Student watches:
+
+**Video 05 → 18:42**
+
+Student leaves the video.
+
+Later student clicks:
+
+**YOUR COURSE → ඔබ නතර කළ තැනින් ඉගෙනීම දිගටම කරගෙන යන්න**
+
+The system must open:
+
+**Video 05**
+
+and position the video at approximately:
+
+**18:42**
+
+NOT at 00:00.
+
+### Important technical requirements for resume:
+
+* Do not rely only on React/component state.
+* Persist the playback position so it survives navigation/reloading.
+* Use the application's existing database/API/storage architecture where appropriate.
+* Do not create duplicate progress records unnecessarily.
+* Update the existing progress record for the same student + course + video.
+* Handle page refresh/reload correctly.
+* Handle mobile browser navigation correctly.
+* Handle pause/play correctly.
+* Handle seeking correctly.
+* Do not save invalid values such as NaN, Infinity, negative values, or a duration greater than the video duration.
+* If the saved position is very close to the end of the video, handle completion according to the application's existing course-completion logic.
+* If there is no saved position, start from the normal beginning.
+* If there is a saved position, resume from that position.
+
+## 5. IMPORTANT – DO NOT BREAK EXISTING PROGRESS TRACKING
+
+The existing LMS may already have video progress/completion tracking.
+
+Before implementing the fix:
+
+* Inspect the current code and understand how video progress is currently stored.
+* Reuse the existing progress system/API/database whenever possible.
+* Do NOT create a second competing progress system.
+* Do NOT break existing course completion, watched percentage, lesson completion, or dashboard functionality.
+* Make the minimum required code changes.
+
+## 6. MOBILE UX
+
+Make sure the complete flow works smoothly on mobile:
+
+Student Dashboard
+→ YOUR COURSE
+→ Continue Learning
+→ Exact video
+→ Exact previous playback position
+
+And:
+
+My Course
+→ Select video
+→ Selected video scrolls into correct position
+→ Open video
+→ Tap video once
+→ Controls appear
+→ Pause/Play works
+→ Back button appears
+→ Tap Back
+→ Return to My Course
+
+The UI should remain clean and should not cover important video content.
+
+## 7. TESTING CHECKLIST
+
+After implementing the changes, test at least these scenarios:
+
+### Test A – Resume
+
+* Open Video A.
+* Watch for several seconds/minutes.
+* Pause.
+* Leave the video.
+* Return to Dashboard.
+* Click "YOUR COURSE / ඔබ නතර කළ තැනින් ඉගෙනීම දිගටම කරගෙන යන්න".
+* Confirm Video A opens at the exact saved position.
+
+### Test B – Mobile navigation
+
+* Open a video on mobile.
+* Tap the video once.
+* Confirm controls appear.
+* Pause.
+* Confirm playback stops.
+* Play again.
+* Confirm it continues from the same position.
+
+### Test C – Back button
+
+* Open video.
+* Tap video once.
+* Confirm Back button appears.
+* Tap Back.
+* Confirm the student returns to the previous My Course/video-list view.
+
+### Test D – Selected video scrolling
+
+* Open My Course on mobile.
+* Select a video that is far down the list.
+* Confirm the selected video automatically scrolls into the correct visible position below its relevant topic/section.
+* Confirm it does NOT incorrectly position the first video at the bottom.
+
+### Test E – Refresh
+
+* Open a video.
+* Watch to a specific timestamp.
+* Refresh/reload the page.
+* Confirm the saved progress still exists and the resume functionality can return to the correct timestamp.
+
+### Test F – Multiple videos
+
+* Watch Video A and leave it at one timestamp.
+* Watch Video B and leave it at another timestamp.
+* Confirm each video's progress remains separate and the dashboard resumes the correct last-watched video.
+
+## FINAL REQUIREMENT
+
+Before finishing, inspect the implementation carefully for:
+
+* Mobile responsiveness
+* Incorrect scroll calculations
+* Race conditions while loading video metadata
+* Video seek timing issues
+* Duplicate progress updates
+* Incorrect student/video associations
+* State reset problems
+* Navigation/reload problems
+
+Then provide a concise summary of:
+
+1. Files/components changed
+2. What was fixed
+3. How video resume is now stored
+4. How the exact timestamp is restored
+5. What tests were performed
+
+Again: **Do not modify unrelated parts of the application. Preserve the current design and functionality and make only the necessary fixes described above.**

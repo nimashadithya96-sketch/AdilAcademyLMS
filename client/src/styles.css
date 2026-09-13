@@ -4414,3 +4414,167 @@ button {
   .registration-success-modal-v37 { padding: 24px 18px 20px; border-radius: 20px; }
   .registration-success-row-v37 { grid-template-columns: 1fr; gap: 5px; }
 }
+
+
+/* ===== ADIL ACADEMY HOME V42 PREMIUM ENGLISH ===== */
+.academy-home{
+  --aa-green:#8bff55;
+  --aa-green-2:#49dc86;
+  --aa-gold:#ddb85d;
+  --aa-ink:#030805;
+  --aa-panel:#09150e;
+  --aa-soft:#a9bbb0;
+  background:
+    radial-gradient(circle at 12% 3%,rgba(221,184,93,.075),transparent 24%),
+    radial-gradient(circle at 90% 16%,rgba(139,255,85,.075),transparent 25%),
+    #030805;
+}
+.academy-home .academy-public-header{
+  position:fixed;
+  background:rgba(3,9,6,.82);
+  border-color:rgba(255,255,255,.075);
+  box-shadow:0 12px 40px rgba(0,0,0,.18);
+  backdrop-filter:blur(22px) saturate(135%);
+}
+.academy-home .academy-nav-links>a:not(.button){position:relative;letter-spacing:.02em}
+.academy-home .academy-nav-links>a:not(.button)::after{
+  content:"";position:absolute;left:0;right:100%;bottom:-11px;height:2px;border-radius:99px;
+  background:linear-gradient(90deg,var(--aa-gold),var(--aa-green));transition:right .25s ease;
+}
+.academy-home .academy-nav-links>a:not(.button):hover::after{right:0}
+
+.academy-home .academy-hero{
+  min-height:830px;padding-top:190px;
+  background:
+    radial-gradient(circle at 74% 22%,rgba(139,255,85,.14),transparent 25%),
+    radial-gradient(circle at 14% 74%,rgba(221,184,93,.09),transparent 26%),
+    linear-gradient(145deg,#020704 0%,#07140b 48%,#06180d 100%);
+}
+.academy-home .academy-hero:after{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(115deg,transparent 18%,rgba(255,255,255,.022) 48%,transparent 71%);
+  background-size:220% 100%;animation:aaHomeShine 12s linear infinite;
+}
+.academy-home .academy-kicker{
+  color:#dfffd3;border-color:rgba(139,255,85,.34);
+  background:linear-gradient(90deg,rgba(139,255,85,.10),rgba(221,184,93,.06));
+  box-shadow:inset 0 1px rgba(255,255,255,.06),0 8px 35px rgba(0,0,0,.15);
+}
+.academy-home .academy-hero h1{max-width:760px;text-wrap:balance;font-size:clamp(50px,6vw,84px)}
+.academy-home .academy-hero h1 span{
+  background:linear-gradient(90deg,var(--aa-green) 0%,#b8ff9a 48%,var(--aa-gold) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.academy-home .academy-hero-copy>p{max-width:690px;color:#b2c1b7;font-size:17px}
+.academy-home .academy-hero-actions .button-primary{
+  border-color:var(--aa-green);background:linear-gradient(135deg,#91ff61,#64ed7e);
+  box-shadow:0 15px 45px rgba(100,237,126,.18);
+}
+.academy-home .academy-hero-actions .button-primary:hover{
+  transform:translateY(-2px);box-shadow:0 20px 55px rgba(100,237,126,.26);
+}
+.academy-home .academy-trust-row{gap:10px}
+.academy-home .academy-trust-row span{
+  padding:9px 12px;border:1px solid rgba(255,255,255,.08);border-radius:999px;
+  background:rgba(255,255,255,.025);backdrop-filter:blur(10px);
+}
+
+.academy-home .academy-hub-card{
+  border-color:rgba(139,255,85,.3);
+  background:radial-gradient(circle at 88% 12%,rgba(221,184,93,.10),transparent 29%),linear-gradient(145deg,rgba(14,48,26,.98),rgba(4,16,9,.98));
+  box-shadow:0 40px 120px rgba(0,0,0,.46),0 0 0 1px rgba(255,255,255,.025) inset;
+  animation:aaHomeFloat 7s ease-in-out infinite;
+}
+.academy-home .academy-hub-course{backdrop-filter:blur(8px)}
+.academy-home .academy-hub-course:hover{transform:translateX(5px) translateY(-1px);border-color:rgba(221,184,93,.42)}
+
+.academy-home .academy-section{padding:116px 0}
+.academy-home .academy-section-heading h2,
+.academy-home .academy-journey-copy h2,
+.academy-home .academy-platform-copy h2,
+.academy-home .academy-faq-intro h2{ text-wrap:balance;font-size:clamp(36px,4.2vw,56px) }
+.academy-home .academy-eyebrow{color:#a8ff83}
+
+.academy-home .academy-courses-section{
+  background:radial-gradient(circle at 0 0,rgba(139,255,85,.06),transparent 27%),linear-gradient(180deg,#07130c,#050d08);
+}
+.academy-home .academy-course-grid{gap:22px}
+.academy-home .academy-course-card{
+  border-color:rgba(255,255,255,.095);border-radius:24px;background:linear-gradient(165deg,#0b1a11,#07110b);
+  box-shadow:0 20px 60px rgba(0,0,0,.22);
+}
+.academy-home .academy-course-card:hover{
+  transform:translateY(-8px);border-color:rgba(139,255,85,.38);
+  box-shadow:0 32px 85px rgba(0,0,0,.38),0 0 45px rgba(139,255,85,.045);
+}
+.academy-home .academy-course-image{height:220px}
+.academy-home .academy-course-icon{border:1px solid rgba(221,184,93,.2)}
+.academy-home .academy-course-meta strong{color:#b7ff9b}
+.academy-home .academy-course-search{min-height:56px;border-radius:16px;background:rgba(9,23,14,.86)}
+
+.academy-home .academy-benefit-card{
+  min-height:270px;border-radius:22px;
+  background:radial-gradient(circle at 90% 5%,rgba(139,255,85,.055),transparent 30%),linear-gradient(145deg,#0b1911,#06100a);
+  transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;
+}
+.academy-home .academy-benefit-card:hover{
+  transform:translateY(-6px);border-color:rgba(221,184,93,.27);box-shadow:0 24px 65px rgba(0,0,0,.28);
+}
+.academy-home .academy-benefit-card>span{color:rgba(221,184,93,.18)}
+.academy-home .academy-benefit-card>div{box-shadow:0 10px 32px rgba(139,255,85,.05)}
+
+.academy-home .academy-journey-section{
+  position:relative;background:radial-gradient(circle at 17% 40%,rgba(221,184,93,.07),transparent 28%),linear-gradient(140deg,#0d2a18,#06140c);
+}
+.academy-home .academy-step{
+  min-height:290px;border-radius:22px;background:linear-gradient(160deg,rgba(7,23,13,.84),rgba(2,11,6,.7));transition:.25s ease;
+}
+.academy-home .academy-step:hover{transform:translateY(-5px);border-color:rgba(139,255,85,.3)}
+.academy-home .academy-step>span{color:var(--aa-gold)}
+
+.academy-home .academy-platform-preview{
+  border-radius:28px;border-color:rgba(139,255,85,.28);
+  box-shadow:0 36px 100px rgba(0,0,0,.34),0 0 65px rgba(139,255,85,.035);
+}
+.academy-home .academy-preview-progress span{background:linear-gradient(90deg,var(--aa-green),var(--aa-green-2),var(--aa-gold))}
+
+.academy-home .academy-faq-section{
+  background:radial-gradient(circle at 80% 30%,rgba(139,255,85,.045),transparent 27%),#040b07;
+}
+.academy-home .academy-faq-list details{
+  border-radius:18px;background:linear-gradient(145deg,#09170f,#06100a);box-shadow:0 14px 40px rgba(0,0,0,.10);
+}
+.academy-home .academy-faq-list details[open]{border-color:rgba(139,255,85,.34);box-shadow:0 18px 55px rgba(0,0,0,.20)}
+.academy-home .academy-faq-list summary{min-height:74px;font-size:14px}
+
+.academy-home .academy-cta-card{
+  padding:56px;border-radius:30px;border-color:rgba(139,255,85,.3);
+  background:radial-gradient(circle at 82% 10%,rgba(139,255,85,.22),transparent 28%),radial-gradient(circle at 10% 100%,rgba(221,184,93,.10),transparent 28%),linear-gradient(140deg,#123520,#06150c);
+  box-shadow:0 28px 85px rgba(0,0,0,.28);
+}
+.academy-home .academy-footer{background:radial-gradient(circle at 15% 0,rgba(221,184,93,.045),transparent 24%),#020805}
+
+@keyframes aaHomeFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes aaHomeShine{from{background-position:130% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){
+  .academy-home .academy-hub-card,.academy-home .academy-hero:after{animation:none}
+  .academy-home *{scroll-behavior:auto!important}
+}
+@media (max-width:980px){
+  .academy-home .academy-public-header{position:absolute}
+  .academy-home .academy-hero{min-height:auto;padding-top:148px}
+  .academy-home .academy-hub-card{animation:none}
+  .academy-home .academy-section{padding:88px 0}
+  .academy-home .academy-cta-card{padding:38px}
+}
+@media (max-width:680px){
+  .academy-home .section-shell{width:min(100% - 28px,1180px)}
+  .academy-home .academy-hero{padding-top:132px;padding-bottom:76px}
+  .academy-home .academy-hero h1{font-size:clamp(42px,13vw,60px)}
+  .academy-home .academy-hero-copy>p{font-size:15px;line-height:1.7}
+  .academy-home .academy-trust-row span{font-size:10px}
+  .academy-home .academy-course-image{height:195px}
+  .academy-home .academy-section{padding:72px 0}
+  .academy-home .academy-cta-card{padding:30px 24px;border-radius:23px}
+}
+/* ===== END ADIL ACADEMY HOME V42 ===== */

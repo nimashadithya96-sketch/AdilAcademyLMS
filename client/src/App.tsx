@@ -1233,19 +1233,13 @@ function HomePage() {
           <div className="academy-hero-glow academy-hero-glow-two" />
           <div className="section-shell academy-hero-shell">
             <div className="academy-hero-copy">
-              <span className="academy-kicker">
-                <Sparkles size={16} />
-                LEARN • GROW • ACHIEVE
-              </span>
+              <span className="academy-kicker">PRACTICAL ONLINE EDUCATION • SRI LANKA</span>
               <h1 className="academy-hero-title">
                 <span>Learn Today.</span>
                 <span className="academy-hero-title-accent">Grow Every Day.</span>
                 <span>Build Your Future.</span>
               </h1>
-              <p>
-                ඔබේ ඉලක්කයට ගැළපෙන පාඨමාලා සහ නිවැරදි මඟපෙන්වීම සමඟ
-                සාර්ථක අනාගතයක් ගොඩනඟන්න.
-              </p>
+              <p>Practical, structured online learning designed to build real-world skills in technology, digital finance, ICT and Korean language.</p>
               <div className="academy-hero-actions">
                 <a className="button button-primary" href="#available-courses">
                   පාඨමාලා බලන්න <ArrowRight size={18} />
@@ -1420,7 +1414,7 @@ function HomePage() {
             <div className="academy-journey-copy">
               <span className="academy-eyebrow">HOW IT WORKS</span>
               <h2>ඔබේ learning journey එක steps තුනකින් අරඹන්න</h2>
-              <p>Course එක තෝරා, application එක submit කර, approval ලැබුණු පසු secure student portal එකෙන් ඉගෙනීම අරඹන්න.</p>
+              <p>Choose your course, submit your application, complete verification, and begin learning through your secure student portal.</p>
               <Link className="button button-primary" to="/login">
                 Start your application <ArrowRight size={18} />
               </Link>
@@ -1494,13 +1488,13 @@ function HomePage() {
           <div className="section-shell academy-faq-shell">
             <div className="academy-faq-intro">
               <span className="academy-eyebrow">FREQUENTLY ASKED QUESTIONS</span>
-              <h2>ඔබට අවශ්‍ය පිළිතුරු</h2>
-              <p>Enrollment කිරීමට පෙර වැදගත් මූලික තොරතුරු මෙතැනින් බලන්න.</p>
+              <h2>Everything You Need to Know</h2>
+              <p>Clear answers to the most important questions before you begin your learning journey.</p>
             </div>
             <div className="academy-faq-list">
               <details>
                 <summary>Course එකකට apply කරන්නේ කොහොමද?<ChevronRight size={18} /></summary>
-                <p>Course card එකේ Apply now හෝ Admission Form button එක භාවිත කර details සහ payment proof submit කරන්න.</p>
+                <p>Use Apply Now or the Admission Form to submit your details and payment proof securely.</p>
               </details>
               <details>
                 <summary>Payment කළ විගස course access ලැබෙනවාද?<ChevronRight size={18} /></summary>

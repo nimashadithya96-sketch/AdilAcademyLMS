@@ -15,6 +15,7 @@ import {
 } from "../../../db/schema";
 import { HttpError, requireAuthenticatedUser, requireRole } from "../../lib/auth";
 import { asyncRoute } from "../../lib/http";
+import { ensureRevisionEligibilityState } from "../revision/student-service"; // ADIL_STUDENT_REVISION_V46
 
 export const lessonQandARouter = Router();
 
@@ -348,13 +349,19 @@ lessonQandARouter.post(
         .where(eq(lessonQuizAttempts.id, attempt.id))
         .returning();
     }
+    const revisionUnlock = completedAttempt?.completedAt
+      ? await ensureRevisionEligibilityState(db, user.id)
+      : null;
     response.json({
       answer: {
         ...answer,
         correctOption: question.correctOption,
         explanation: question.explanation
       },
-      completedAttempt
+      completedAttempt,
+      revisionUnlock: revisionUnlock
+        ? { newlyUnlocked: revisionUnlock.newlyUnlocked, eligible: revisionUnlock.eligibility.eligible }
+        : null
     });
   })
 );

@@ -1,0 +1,480 @@
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { Router } from "express";
+import { z } from "zod";
+import { requireDatabase } from "../../../db/client";
+import {
+  courseSections,
+  courses,
+  enrollments,
+  lessonProgress,
+  lessonQuizAnswers,
+  lessonQuizAttempts,
+  lessonQuizQuestions,
+  lessonQuizWatchProgress,
+  lessons
+} from "../../../db/schema";
+import { HttpError, requireAuthenticatedUser, requireRole } from "../../lib/auth";
+import { asyncRoute } from "../../lib/http";
+
+export const lessonQandARouter = Router();
+
+const lessonQuestionInput = z.object({
+  question: z.string().trim().min(3).max(2000),
+  options: z.array(z.string().trim().min(1).max(1000)).length(5),
+  correctOption: z.coerce.number().int().min(0).max(4),
+  explanation: z.string().trim().max(3000).optional(),
+  position: z.coerce.number().int().min(1),
+  isPublished: z.boolean().default(true)
+});
+const lessonQuestionUpdateInput = lessonQuestionInput.partial().refine((value) => Object.keys(value).length > 0);
+const answerInput = z.object({
+  questionId: z.string().uuid(),
+  selectedOption: z.coerce.number().int().min(0).max(4)
+});
+const watchInput = z.object({ elapsedSeconds: z.coerce.number().int().min(1).max(15) });
+
+function requiredRewatchSeconds(durationSeconds: number) {
+  return Math.max(1, Math.ceil((durationSeconds > 0 ? durationSeconds : 600) * 0.5));
+}
+
+function routeParam(value: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+async function requireCompletedLesson(userId: string, lessonId: string) {
+  const db = requireDatabase();
+  const [record] = await db
+    .select({
+      lessonId: lessons.id,
+      lessonTitle: lessons.title,
+      sectionId: lessons.sectionId,
+      sectionTitle: courseSections.title,
+      courseId: courses.id,
+      courseTitle: courses.title,
+      videoProvider: lessons.videoProvider,
+      videoId: lessons.videoId,
+      durationSeconds: lessons.durationSeconds,
+      enrollmentId: enrollments.id,
+      progressPercent: lessonProgress.progressPercent
+    })
+    .from(lessons)
+    .innerJoin(courseSections, eq(lessons.sectionId, courseSections.id))
+    .innerJoin(courses, eq(courseSections.courseId, courses.id))
+    .innerJoin(enrollments, and(eq(enrollments.courseId, courses.id), eq(enrollments.userId, userId)))
+    .innerJoin(
+      lessonProgress,
+      and(eq(lessonProgress.enrollmentId, enrollments.id), eq(lessonProgress.lessonId, lessons.id))
+    )
+    .where(
+      and(
+        eq(lessons.id, lessonId),
+        eq(enrollments.status, "ACTIVE"),
+        gte(lessonProgress.progressPercent, 80)
+      )
+    )
+    .limit(1);
+  if (!record) throw new HttpError(403, "Watch at least 80% of this video lesson before opening its Q & A.");
+  return record;
+}
+
+async function lessonAttemptState(userId: string, lessonId: string, durationSeconds: number) {
+  const db = requireDatabase();
+  const [latestAttempt] = await db
+    .select()
+    .from(lessonQuizAttempts)
+    .where(and(eq(lessonQuizAttempts.userId, userId), eq(lessonQuizAttempts.lessonId, lessonId)))
+    .orderBy(desc(lessonQuizAttempts.attemptNumber))
+    .limit(1);
+  const [watch] = await db
+    .select()
+    .from(lessonQuizWatchProgress)
+    .where(and(eq(lessonQuizWatchProgress.userId, userId), eq(lessonQuizWatchProgress.lessonId, lessonId)))
+    .limit(1);
+  const watchedSecondsTotal = watch?.watchedSecondsTotal ?? 0;
+  const requiredSeconds = requiredRewatchSeconds(durationSeconds);
+  const baseline = latestAttempt?.completedAt ? latestAttempt.watchSecondsAtCompletion ?? 0 : watchedSecondsTotal;
+  const watchedSinceAttempt = latestAttempt?.completedAt ? Math.max(0, watchedSecondsTotal - baseline) : 0;
+  return {
+    latestAttempt: latestAttempt ?? null,
+    watchedSecondsTotal,
+    watchedSinceAttempt,
+    requiredSeconds,
+    retakeEligible: Boolean(latestAttempt?.completedAt && watchedSinceAttempt >= requiredSeconds)
+  };
+}
+
+lessonQandARouter.get(
+  "/student/q-and-a",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const db = requireDatabase();
+    const completed = await db
+      .select({
+        lessonId: lessons.id,
+        lessonTitle: lessons.title,
+        lessonPosition: lessons.position,
+        durationSeconds: lessons.durationSeconds,
+        sectionId: courseSections.id,
+        sectionTitle: courseSections.title,
+        sectionPosition: courseSections.position,
+        courseId: courses.id,
+        courseTitle: courses.title
+      })
+      .from(enrollments)
+      .innerJoin(courses, eq(enrollments.courseId, courses.id))
+      .innerJoin(courseSections, eq(courseSections.courseId, courses.id))
+      .innerJoin(lessons, eq(lessons.sectionId, courseSections.id))
+      .innerJoin(
+        lessonProgress,
+        and(eq(lessonProgress.enrollmentId, enrollments.id), eq(lessonProgress.lessonId, lessons.id))
+      )
+      .where(
+        and(
+          eq(enrollments.userId, user.id),
+          eq(enrollments.status, "ACTIVE"),
+          gte(lessonProgress.progressPercent, 80)
+        )
+      )
+      .orderBy(asc(courses.title), asc(courseSections.position), asc(lessons.position));
+    if (!completed.length) {
+      response.json({ courses: [] });
+      return;
+    }
+    const lessonIds = completed.map((item) => item.lessonId);
+    const questions = await db
+      .select({ id: lessonQuizQuestions.id, lessonId: lessonQuizQuestions.lessonId })
+      .from(lessonQuizQuestions)
+      .where(and(inArray(lessonQuizQuestions.lessonId, lessonIds), eq(lessonQuizQuestions.isPublished, true)));
+    const attempts = await db
+      .select()
+      .from(lessonQuizAttempts)
+      .where(and(eq(lessonQuizAttempts.userId, user.id), inArray(lessonQuizAttempts.lessonId, lessonIds)))
+      .orderBy(desc(lessonQuizAttempts.attemptNumber));
+    const questionCounts = new Map<string, number>();
+    for (const item of questions) questionCounts.set(item.lessonId, (questionCounts.get(item.lessonId) ?? 0) + 1);
+    const latestByLesson = new Map<string, (typeof attempts)[number]>();
+    for (const attempt of attempts) if (!latestByLesson.has(attempt.lessonId)) latestByLesson.set(attempt.lessonId, attempt);
+
+    const courseMap = new Map<string, { id: string; title: string; modules: Map<string, { id: string; title: string; position: number; lessons: unknown[] }> }>();
+    for (const item of completed) {
+      if ((questionCounts.get(item.lessonId) ?? 0) === 0) continue;
+
+      let course = courseMap.get(item.courseId);
+      if (!course) {
+        course = { id: item.courseId, title: item.courseTitle, modules: new Map() };
+        courseMap.set(item.courseId, course);
+      }
+      let module = course.modules.get(item.sectionId);
+      if (!module) {
+        module = { id: item.sectionId, title: item.sectionTitle, position: item.sectionPosition, lessons: [] };
+        course.modules.set(item.sectionId, module);
+      }
+      const latest = latestByLesson.get(item.lessonId);
+      module.lessons.push({
+        id: item.lessonId,
+        title: item.lessonTitle,
+        position: item.lessonPosition,
+        questionCount: questionCounts.get(item.lessonId) ?? 0,
+        attemptNumber: latest?.attemptNumber ?? 0,
+        completedAttempt: Boolean(latest?.completedAt),
+        scorePercent: latest?.scorePercent ?? null
+      });
+    }
+    response.json({
+      courses: Array.from(courseMap.values()).map((course) => ({
+        id: course.id,
+        title: course.title,
+        modules: Array.from(course.modules.values()).sort((a, b) => a.position - b.position)
+      }))
+    });
+  })
+);
+
+lessonQandARouter.get(
+  "/student/q-and-a/lessons/:lessonId",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const lesson = await requireCompletedLesson(user.id, routeParam(request.params.lessonId));
+    const db = requireDatabase();
+    const questions = await db
+      .select()
+      .from(lessonQuizQuestions)
+      .where(and(eq(lessonQuizQuestions.lessonId, lesson.lessonId), eq(lessonQuizQuestions.isPublished, true)))
+      .orderBy(asc(lessonQuizQuestions.position));
+
+    if (!questions.length) {
+      throw new HttpError(404, "මෙම lesson එකට දැනට published Q & A නොමැත.");
+    }
+
+    const state = await lessonAttemptState(user.id, lesson.lessonId, lesson.durationSeconds);
+    const answers = state.latestAttempt
+      ? await db.select().from(lessonQuizAnswers).where(eq(lessonQuizAnswers.attemptId, state.latestAttempt.id))
+      : [];
+    const answerMap = new Map(answers.map((answer) => [answer.questionId, answer]));
+    response.json({
+      lesson: {
+        id: lesson.lessonId,
+        title: lesson.lessonTitle,
+        moduleTitle: lesson.sectionTitle,
+        courseTitle: lesson.courseTitle,
+        videoProvider: lesson.videoProvider,
+        videoId: lesson.videoId,
+        durationSeconds: lesson.durationSeconds
+      },
+      questions: questions.map((question) => {
+        const answer = answerMap.get(question.id);
+        return {
+          id: question.id,
+          question: question.question,
+          options: question.options,
+          position: question.position,
+          answer: answer
+            ? {
+                selectedOption: answer.selectedOption,
+                isCorrect: answer.isCorrect,
+                correctOption: question.correctOption,
+                explanation: question.explanation
+              }
+            : null
+        };
+      }),
+      attempt: state.latestAttempt,
+      answeredCount: answers.length,
+      canStart: !state.latestAttempt || state.retakeEligible,
+      retake: {
+        eligible: state.retakeEligible,
+        watchedSeconds: state.watchedSinceAttempt,
+        requiredSeconds: state.requiredSeconds,
+        progressPercent: Math.min(100, Math.round((state.watchedSinceAttempt / state.requiredSeconds) * 100))
+      }
+    });
+  })
+);
+
+lessonQandARouter.post(
+  "/student/q-and-a/lessons/:lessonId/attempts",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const lesson = await requireCompletedLesson(user.id, routeParam(request.params.lessonId));
+    const db = requireDatabase();
+    const questions = await db
+      .select({ id: lessonQuizQuestions.id })
+      .from(lessonQuizQuestions)
+      .where(and(eq(lessonQuizQuestions.lessonId, lesson.lessonId), eq(lessonQuizQuestions.isPublished, true)));
+    if (!questions.length) throw new HttpError(400, "This lesson does not have a published quiz yet.");
+    const state = await lessonAttemptState(user.id, lesson.lessonId, lesson.durationSeconds);
+    if (state.latestAttempt && !state.latestAttempt.completedAt) {
+      response.json({ attempt: state.latestAttempt });
+      return;
+    }
+    if (state.latestAttempt && !state.retakeEligible) {
+      throw new HttpError(403, `Rewatch ${state.requiredSeconds} seconds before starting another attempt.`);
+    }
+    const [attempt] = await db
+      .insert(lessonQuizAttempts)
+      .values({
+        userId: user.id,
+        lessonId: lesson.lessonId,
+        attemptNumber: (state.latestAttempt?.attemptNumber ?? 0) + 1
+      })
+      .returning();
+    response.status(201).json({ attempt });
+  })
+);
+
+lessonQandARouter.post(
+  "/student/q-and-a/attempts/:attemptId/answers",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const input = answerInput.parse(request.body);
+    const db = requireDatabase();
+    const [attempt] = await db
+      .select()
+      .from(lessonQuizAttempts)
+      .where(and(eq(lessonQuizAttempts.id, routeParam(request.params.attemptId)), eq(lessonQuizAttempts.userId, user.id)))
+      .limit(1);
+    if (!attempt) throw new HttpError(404, "Quiz attempt not found.");
+    if (attempt.completedAt) throw new HttpError(409, "This quiz attempt is already locked.");
+    const [question] = await db
+      .select()
+      .from(lessonQuizQuestions)
+      .where(
+        and(
+          eq(lessonQuizQuestions.id, input.questionId),
+          eq(lessonQuizQuestions.lessonId, attempt.lessonId),
+          eq(lessonQuizQuestions.isPublished, true)
+        )
+      )
+      .limit(1);
+    if (!question) throw new HttpError(404, "Question not found.");
+    const [existing] = await db
+      .select()
+      .from(lessonQuizAnswers)
+      .where(and(eq(lessonQuizAnswers.attemptId, attempt.id), eq(lessonQuizAnswers.questionId, question.id)))
+      .limit(1);
+    if (existing) throw new HttpError(409, "This answer is already locked.");
+    const isCorrect = input.selectedOption === question.correctOption;
+    const [answer] = await db
+      .insert(lessonQuizAnswers)
+      .values({ attemptId: attempt.id, questionId: question.id, selectedOption: input.selectedOption, isCorrect })
+      .onConflictDoNothing()
+      .returning();
+    if (!answer) throw new HttpError(409, "This answer is already locked.");
+    const allQuestions = await db
+      .select({ id: lessonQuizQuestions.id })
+      .from(lessonQuizQuestions)
+      .where(and(eq(lessonQuizQuestions.lessonId, attempt.lessonId), eq(lessonQuizQuestions.isPublished, true)));
+    const allAnswers = await db
+      .select()
+      .from(lessonQuizAnswers)
+      .where(eq(lessonQuizAnswers.attemptId, attempt.id));
+    let completedAttempt = null;
+    if (allQuestions.length > 0 && allAnswers.length >= allQuestions.length) {
+      const score = allAnswers.filter((item) => item.isCorrect).length;
+      const [watch] = await db
+        .select({ watchedSecondsTotal: lessonQuizWatchProgress.watchedSecondsTotal })
+        .from(lessonQuizWatchProgress)
+        .where(and(eq(lessonQuizWatchProgress.userId, user.id), eq(lessonQuizWatchProgress.lessonId, attempt.lessonId)))
+        .limit(1);
+      [completedAttempt] = await db
+        .update(lessonQuizAttempts)
+        .set({
+          score,
+          totalQuestions: allQuestions.length,
+          scorePercent: Math.round((score / allQuestions.length) * 100),
+          watchSecondsAtCompletion: watch?.watchedSecondsTotal ?? 0,
+          completedAt: new Date()
+        })
+        .where(eq(lessonQuizAttempts.id, attempt.id))
+        .returning();
+    }
+    response.json({
+      answer: {
+        ...answer,
+        correctOption: question.correctOption,
+        explanation: question.explanation
+      },
+      completedAttempt
+    });
+  })
+);
+
+lessonQandARouter.post(
+  "/student/q-and-a/lessons/:lessonId/watch",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const input = watchInput.parse(request.body);
+    const lesson = await requireCompletedLesson(user.id, routeParam(request.params.lessonId));
+    const db = requireDatabase();
+    const state = await lessonAttemptState(user.id, lesson.lessonId, lesson.durationSeconds);
+    if (!state.latestAttempt?.completedAt) throw new HttpError(400, "Complete the first quiz attempt before retake tracking.");
+    const now = new Date();
+    const [current] = await db
+      .select()
+      .from(lessonQuizWatchProgress)
+      .where(and(eq(lessonQuizWatchProgress.userId, user.id), eq(lessonQuizWatchProgress.lessonId, lesson.lessonId)))
+      .limit(1);
+    if (!current) {
+      const [saved] = await db
+        .insert(lessonQuizWatchProgress)
+        .values({ userId: user.id, lessonId: lesson.lessonId, watchedSecondsTotal: 0, lastHeartbeatAt: now, updatedAt: now })
+        .returning();
+      response.json({ watch: saved, acceptedSeconds: 0 });
+      return;
+    }
+    const elapsedWallSeconds = current.lastHeartbeatAt
+      ? Math.max(0, Math.floor((now.getTime() - current.lastHeartbeatAt.getTime()) / 1000))
+      : 0;
+    const acceptedSeconds = Math.min(input.elapsedSeconds, Math.max(0, elapsedWallSeconds + 2));
+    const [saved] = await db
+      .update(lessonQuizWatchProgress)
+      .set({
+        watchedSecondsTotal: current.watchedSecondsTotal + acceptedSeconds,
+        lastHeartbeatAt: now,
+        updatedAt: now
+      })
+      .where(eq(lessonQuizWatchProgress.id, current.id))
+      .returning();
+    response.json({ watch: saved, acceptedSeconds });
+  })
+);
+
+lessonQandARouter.get(
+  "/admin/lessons/:lessonId/q-and-a",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin", "staff"]);
+    const db = requireDatabase();
+    const questions = await db
+      .select()
+      .from(lessonQuizQuestions)
+      .where(eq(lessonQuizQuestions.lessonId, routeParam(request.params.lessonId)))
+      .orderBy(asc(lessonQuizQuestions.position));
+    response.json({ questions });
+  })
+);
+
+lessonQandARouter.post(
+  "/admin/lessons/:lessonId/q-and-a",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin", "staff"]);
+    const input = lessonQuestionInput.parse(request.body);
+    const db = requireDatabase();
+    const [lesson] = await db.select({ id: lessons.id }).from(lessons).where(eq(lessons.id, routeParam(request.params.lessonId))).limit(1);
+    if (!lesson) throw new HttpError(404, "Lesson not found.");
+    const [question] = await db
+      .insert(lessonQuizQuestions)
+      .values({ lessonId: lesson.id, ...input, explanation: input.explanation || null })
+      .returning();
+    response.status(201).json({ question });
+  })
+);
+
+lessonQandARouter.patch(
+  "/admin/lesson-q-and-a/:questionId",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin", "staff"]);
+    const input = lessonQuestionUpdateInput.parse(request.body);
+    const db = requireDatabase();
+    const [question] = await db
+      .update(lessonQuizQuestions)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(lessonQuizQuestions.id, routeParam(request.params.questionId)))
+      .returning();
+    if (!question) throw new HttpError(404, "Question not found.");
+    response.json({ question });
+  })
+);
+
+lessonQandARouter.delete(
+  "/admin/lesson-q-and-a/:questionId",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin", "staff"]);
+    const db = requireDatabase();
+    const questionId = routeParam(request.params.questionId);
+
+    const [existingQuestion] = await db
+      .select({ id: lessonQuizQuestions.id })
+      .from(lessonQuizQuestions)
+      .where(eq(lessonQuizQuestions.id, questionId))
+      .limit(1);
+
+    if (!existingQuestion) {
+      throw new HttpError(404, "Question not found.");
+    }
+
+    await db
+      .delete(lessonQuizAnswers)
+      .where(eq(lessonQuizAnswers.questionId, questionId));
+
+    const [question] = await db
+      .delete(lessonQuizQuestions)
+      .where(eq(lessonQuizQuestions.id, questionId))
+      .returning();
+
+    response.json({
+      success: true,
+      message: "Question permanently deleted.",
+      question
+    });
+  })
+);

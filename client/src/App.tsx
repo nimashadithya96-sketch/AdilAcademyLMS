@@ -60,6 +60,8 @@ import type {
   UserRole
 } from "../../shared/platform";
 import { sriLankaLocations, sriLankaProvinces } from "./sri-lanka-locations";
+import RevisionAdminManager from "./RevisionAdminManager"; // ADIL_REVISION_MANAGER_V45
+import StudentRevisionCenter from "./StudentRevisionCenter"; // ADIL_STUDENT_REVISION_V46
 
 const courseModules = [
   {
@@ -1944,6 +1946,7 @@ const dashboardNav: Record<
   student: [
     { label: "Overview", icon: <LayoutDashboard /> },
     { label: "My Course", icon: <BookOpen /> },
+    { label: "Revision", icon: <GraduationCap /> },
     { label: "Progress", icon: <BarChart3 /> },
     { label: "Q & A", icon: <Target /> },
     { label: "Certificates", icon: <Award /> },
@@ -1975,6 +1978,7 @@ const dashboardNav: Record<
   admin: [
     { label: "Overview", icon: <LayoutDashboard /> },
     { label: "Course", icon: <BookOpen /> },
+    { label: "Revision Manager", icon: <GraduationCap /> },
     { label: "Students", icon: <Users /> },
     { label: "Payments", icon: <CreditCard /> },
     { label: "CCO Activations", icon: <UserCheck /> },
@@ -3454,6 +3458,7 @@ function StudentFeatureWorkspace({ module }: { module: string }) {
 
   if (module === "Q & A") return <StudentQAndAWorkspace />;
   if (module === "Balance Payment") return <StudentBalancePaymentWorkspace />;
+  if (module === "Revision") return <StudentRevisionCenter VideoPlayer={ProtectedVideoPlayer} />;
 
   if (loading) return <section className="dash-card workspace-card"><h3>Loading...</h3></section>;
   if (failed || !summary) return <section className="dash-card workspace-card"><h3>Data load කළ නොහැක</h3><p>Page එක refresh කරන්න.</p></section>;
@@ -4357,6 +4362,7 @@ function FeatureWorkspace({
   if (role === "consultant" && module === "Income") return <ConsultantIncomeWorkspace />;
   if (role === "consultant" && module === "CCO Activation") return <ConsultantCcoActivationWorkspace />;
   if (role === "admin" && module === "Course") return <CourseManagementWorkspace />;
+  if (role === "admin" && module === "Revision Manager") return <RevisionAdminManager />;
   if (role === "admin" && module === "Commissions") return <AdminCommissionWorkspace />;
   if (role === "admin" && module === "CCO Activations") return <AdminCcoActivationWorkspace />;
   if (role === "admin" && module === "CCO Main Buy") return <AdminCcoMainBuyWorkspace />;

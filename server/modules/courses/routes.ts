@@ -22,6 +22,7 @@ import {
 import { HttpError, requireAuthenticatedUser, requireRole } from "../../lib/auth";
 import { asyncRoute } from "../../lib/http";
 import { deletePrivateFile, downloadPrivateFile, uploadPrivateFile } from "../../services/storage";
+import { ensureRevisionEligibilityState } from "../revision/student-service"; // ADIL_STUDENT_REVISION_V46
 
 export const courseRouter = Router();
 
@@ -736,10 +737,16 @@ courseRouter.post(
       })
       .returning();
 
+    const revisionUnlock = progressPercent >= 100
+      ? await ensureRevisionEligibilityState(db, user.id)
+      : null;
     response.json({
       progress: saved,
       acceptedSeconds,
-      durationSeconds: effectiveDurationSeconds
+      durationSeconds: effectiveDurationSeconds,
+      revisionUnlock: revisionUnlock
+        ? { newlyUnlocked: revisionUnlock.newlyUnlocked, eligible: revisionUnlock.eligibility.eligible }
+        : null
     });
   })
 );

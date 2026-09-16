@@ -4,6 +4,7 @@ run = "npm run dev"
 [deployment]
 build = ["sh", "-c", "npm run build"]
 run = ["sh", "-c", "npm start"]
+deploymentTarget = "gce"
 
 [[ports]]
 localPort = 3000

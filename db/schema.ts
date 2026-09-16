@@ -959,3 +959,91 @@ export const auditLogs = pgTable("audit_logs", {
     .defaultNow()
     .notNull()
 });
+
+
+// ADIL_REVISION_MANAGER_V45: standalone Basic / Advanced Revision content foundation.
+export const revisionSeries = pgTable(
+  "revision_series",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    level: text("level").notNull(),
+    isComplete: boolean("is_complete").default(false).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [uniqueIndex("revision_series_course_level_unique").on(table.courseId, table.level)]
+);
+
+export const revisionVideos = pgTable("revision_videos", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  seriesId: uuid("series_id")
+    .notNull()
+    .references(() => revisionSeries.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  videoProvider: text("video_provider"),
+  videoId: text("video_id"),
+  content: text("content"),
+  durationSeconds: integer("duration_seconds").default(0).notNull(),
+  position: integer("position").notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+
+// ADIL_STUDENT_REVISION_V46: per-student Revision access, daily batches and watch progress.
+export const revisionStudentAccess = pgTable(
+  "revision_student_access",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+    revisionUnlockedAt: timestamp("revision_unlocked_at", { withTimezone: true }).defaultNow().notNull(),
+    welcomeSeenAt: timestamp("welcome_seen_at", { withTimezone: true }),
+    advancedUnlockedAt: timestamp("advanced_unlocked_at", { withTimezone: true }),
+    advancedCongratulationsSeenAt: timestamp("advanced_congratulations_seen_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [uniqueIndex("revision_student_access_user_course_unique").on(table.userId, table.courseId)]
+);
+
+export const revisionStudentLevelState = pgTable(
+  "revision_student_level_state",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+    level: text("level").notNull(),
+    batchStartPosition: integer("batch_start_position").default(1).notNull(),
+    batchUnlockedAt: timestamp("batch_unlocked_at", { withTimezone: true }).defaultNow().notNull(),
+    rolloverMidnight: timestamp("rollover_midnight", { withTimezone: true }),
+    midnightActiveSlot: integer("midnight_active_slot"),
+    nextBatchUnlockAt: timestamp("next_batch_unlock_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [uniqueIndex("revision_student_level_state_unique").on(table.userId, table.courseId, table.level)]
+);
+
+export const revisionVideoProgress = pgTable(
+  "revision_video_progress",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id").notNull().references(() => revisionVideos.id, { onDelete: "cascade" }),
+    progressPercent: integer("progress_percent").default(0).notNull(),
+    watchedSeconds: integer("watched_seconds").default(0).notNull(),
+    resumeSeconds: integer("resume_seconds").default(0).notNull(),
+    detectedDurationSeconds: integer("detected_duration_seconds").default(0).notNull(),
+    reachedEightyAt: timestamp("reached_eighty_at", { withTimezone: true }),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [uniqueIndex("revision_video_progress_user_video_unique").on(table.userId, table.videoId)]
+);

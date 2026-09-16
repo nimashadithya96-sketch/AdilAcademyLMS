@@ -27,6 +27,8 @@ import { uploadPrivateFile } from "./services/storage";
 import { sendApplicationReceived, sendPayId } from "./services/email";
 import { apiErrorHandler } from "./lib/http";
 import { courseRouter } from "./modules/courses/routes";
+import { revisionRouter } from "./modules/revision/routes"; // ADIL_REVISION_MANAGER_V45
+import { revisionStudentRouter } from "./modules/revision/student-routes"; // ADIL_STUDENT_REVISION_V46
 import { lessonQandARouter } from "./modules/courses/lesson-q-and-a";
 import { paymentRouter } from "./modules/payments/routes";
 import { consultantRouter } from "./modules/consultants/routes";
@@ -567,6 +569,8 @@ app.post("/api/auth/logout", async (request, response) => {
 });
 
 app.use("/api", courseRouter);
+app.use("/api", revisionRouter);
+app.use("/api", revisionStudentRouter);
 app.use("/api", lessonQandARouter);
 app.use("/api", paymentRouter);
 app.use("/api", consultantRouter);

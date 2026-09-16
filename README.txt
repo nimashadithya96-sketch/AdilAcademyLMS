@@ -1,15 +1,18 @@
-ADIL ACADEMY — MY COURSE MOBILE INLINE VIDEO UPDATE ONLY
+ADIL ACADEMY — v45 PROJECT EXPORT HELPER
 
-This patch changes ONLY the first requested mobile My Course behavior:
-- On screens up to 900px wide, tapping a lesson shows that lesson's video player directly below the selected lesson/topic.
-- The mobile catalog is no longer clipped to a fixed 420px scroll area, so the inline player can be seen naturally.
-- Desktop My Course keeps the existing two-column layout.
-- No video control, Back button, Resume Learning, server, database, Q&A, daily-limit, admin-unlock, or progress logic is changed by this patch.
+Purpose:
+Create a clean ZIP of the CURRENT Replit LMS source so the Revision Manager v45 update can be built safely against the exact project you are running.
 
-Apply from the Replit project root:
-node apply-mobile-inline-player-v27.mjs
+How to use:
+1. Upload this helper ZIP to the main Replit project folder (~/workspace).
+2. Extract it.
+3. In Replit Shell run:
+   bash EXPORT_CURRENT_PROJECT_FOR_V45.sh
+4. It will create:
+   Adil_Academy_Current_Project_For_v45.zip
+5. Download that generated ZIP from Replit and upload it to ChatGPT.
 
-Then build/run the project using your normal commands.
-
-Rollback if needed:
-node rollback-mobile-inline-player-v27.mjs
+Important:
+- .env / secrets are excluded.
+- node_modules, build output, logs, local DB files and backups are excluded.
+- This helper DOES NOT modify your LMS code.

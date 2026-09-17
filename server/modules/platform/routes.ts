@@ -9,6 +9,9 @@ import {
   certificates,
   commissionEntries,
   commissionCycles,
+  ccoActivationRequests,
+  ccoMainApplications,
+  ccoMainPayIds,
   consultantApplications,
   consultantBankDetails,
   consultantStudentRegistrations,
@@ -479,7 +482,11 @@ platformRouter.get(
       [{ pendingPayments }],
       [{ pendingApplications }],
       [{ activeAccounts }],
-      [{ commissionCycleCount }]
+      [{ commissionCycleCount }],
+      [{ coursePaymentTotal }],
+      [{ ccoMainPaymentTotal }],
+      [{ ccoAccountPaymentTotal }],
+      [{ consultantPayoutTotal }]
     ] = await Promise.all([
       db.select({ students: count() }).from(users).where(eq(users.role, "student")),
       db
@@ -506,15 +513,53 @@ platformRouter.get(
         .select({ activeAccounts: count() })
         .from(networkAccounts)
         .where(eq(networkAccounts.status, "ACTIVE")),
-      db.select({ commissionCycleCount: count() }).from(commissionCycles)
-    ]);
+      db.select({ commissionCycleCount: count() }).from(commissionCycles),
+      db
+        .select({
+          coursePaymentTotal: sql<string>`COALESCE(SUM(${paymentRequests.paidAmount}), 0)`
+        })
+        .from(paymentRequests)
+        .where(inArray(paymentRequests.status, ["PARTIAL", "APPROVED"])),
+      db
+        .select({
+          ccoMainPaymentTotal: sql<string>`COALESCE(SUM(${ccoMainPayIds.amount}), 0)`
+        })
+        .from(ccoMainApplications)
+        .innerJoin(ccoMainPayIds, eq(ccoMainPayIds.id, ccoMainApplications.payIdId))
+        .where(eq(ccoMainApplications.status, "APPROVED")),
+      db
+        .select({
+          ccoAccountPaymentTotal: sql<string>`COALESCE(SUM(${ccoActivationRequests.amount}), 0)`
+        })
+        .from(ccoActivationRequests)
+        .where(inArray(ccoActivationRequests.status, ["APPROVED", "EXPIRED"])),
+      db
+        .select({
+          consultantPayoutTotal: sql<string>`COALESCE(SUM(${payoutRequests.amount}), 0)`
+        })
+        .from(payoutRequests)
+        .where(eq(payoutRequests.status, "PAID"))
+    ]); // ADIL_TOTAL_AVAILABLE_BALANCE_V48
+    const coursePayments = Number(coursePaymentTotal ?? 0);
+    const ccoMainPayments = Number(ccoMainPaymentTotal ?? 0);
+    const ccoAccountPayments = Number(ccoAccountPaymentTotal ?? 0);
+    const consultantPayouts = Number(consultantPayoutTotal ?? 0);
+    const totalReceived = coursePayments + ccoMainPayments + ccoAccountPayments;
+    const availableBalance = totalReceived - consultantPayouts;
+
     response.json({
       students,
       consultants,
       pendingPayments,
       pendingApplications,
       activeAccounts,
-      commissionCycleCount
+      commissionCycleCount,
+      coursePayments,
+      ccoMainPayments,
+      ccoAccountPayments,
+      consultantPayouts,
+      totalReceived,
+      availableBalance
     });
   })
 );

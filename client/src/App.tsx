@@ -62,6 +62,7 @@ import type {
 import { sriLankaLocations, sriLankaProvinces } from "./sri-lanka-locations";
 import RevisionAdminManager from "./RevisionAdminManager"; // ADIL_REVISION_MANAGER_V45
 import StudentRevisionCenter from "./StudentRevisionCenter"; // ADIL_STUDENT_REVISION_V46
+import HalfPaymentStudentsWorkspace from "./HalfPaymentStudentsWorkspace"; // ADIL_HALF_PAYMENT_STUDENTS_V47
 
 const courseModules = [
   {
@@ -1980,6 +1981,7 @@ const dashboardNav: Record<
     { label: "Course", icon: <BookOpen /> },
     { label: "Revision Manager", icon: <GraduationCap /> },
     { label: "Students", icon: <Users /> },
+    { label: "Half Payment Students", icon: <Wallet /> },
     { label: "Payments", icon: <CreditCard /> },
     { label: "CCO Activations", icon: <UserCheck /> },
     { label: "CCO Main Buy", icon: <CircleDollarSign /> },
@@ -2351,7 +2353,13 @@ type AdminOverviewData = {
   pendingApplications: number;
   activeAccounts: number;
   commissionCycleCount: number;
-};
+  coursePayments: number;
+  ccoMainPayments: number;
+  ccoAccountPayments: number;
+  consultantPayouts: number;
+  totalReceived: number;
+  availableBalance: number;
+}; // ADIL_TOTAL_AVAILABLE_BALANCE_V48
 
 type AdminPaymentView = StudentPaymentView & {
   userId: string; createdAt: string; accountNumber?: string | null;
@@ -2383,6 +2391,25 @@ function AdminDashboard({ onOpen }: { onOpen: (module: string) => void }) {
   if (!overview) return <section className="dash-card"><h3>Admin data loading...</h3></section>;
   return (
     <>
+      <section className="admin-total-balance-bar">
+        <div className="admin-total-balance-main">
+          <span className="admin-total-balance-icon"><Wallet /></span>
+          <div>
+            <span className="eyebrow">LIVE FINANCIAL BALANCE</span>
+            <h3>TOTAL RS. — AVAILABLE BALANCE</h3>
+            <strong>Rs. {overview.availableBalance.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            <small>All approved money received minus consultant payouts marked PAID.</small>
+          </div>
+        </div>
+        <div className="admin-total-balance-breakdown">
+          <div><span>Total received</span><strong className="money-in">+ Rs. {overview.totalReceived.toLocaleString("en-LK")}</strong></div>
+          <div><span>Course payments</span><strong>Rs. {overview.coursePayments.toLocaleString("en-LK")}</strong></div>
+          <div><span>CCO main accounts</span><strong>Rs. {overview.ccoMainPayments.toLocaleString("en-LK")}</strong></div>
+          <div><span>2nd–7th CN buys / trials</span><strong>Rs. {overview.ccoAccountPayments.toLocaleString("en-LK")}</strong></div>
+          <div className="admin-balance-payout"><span>Consultant payouts paid</span><strong>− Rs. {overview.consultantPayouts.toLocaleString("en-LK")}</strong></div>
+        </div>
+        <p className="admin-total-balance-note">Pending commissions, pending payout requests and unpaid balances do not reduce this amount. A deduction happens only after a consultant payout is marked PAID. Refunded course payments are not counted as received.</p>
+      </section>
       <div className="metrics-grid">
         <MetricCard label="Total Students" value={String(overview.students)} note="Click to view & search" icon={<Users />} onClick={() => onOpen("Students")} />
         <MetricCard label="Pending Payments" value={String(overview.pendingPayments)} note="Click to verify" icon={<CreditCard />} onClick={() => onOpen("Payments")} />
@@ -4366,6 +4393,7 @@ function FeatureWorkspace({
   if (role === "admin" && module === "Commissions") return <AdminCommissionWorkspace />;
   if (role === "admin" && module === "CCO Activations") return <AdminCcoActivationWorkspace />;
   if (role === "admin" && module === "CCO Main Buy") return <AdminCcoMainBuyWorkspace />;
+  if (role === "admin" && module === "Half Payment Students") return <HalfPaymentStudentsWorkspace />;
   if (role === "admin" && ["Students", "Payments", "Consultants", "Network"].includes(module)) return <AdminFeatureWorkspace module={module} />;
   const data = workspaceData[role + ":" + module];
   if (!data) {

@@ -4578,3 +4578,83 @@ button {
   .academy-home .academy-cta-card{padding:30px 24px;border-radius:23px}
 }
 /* ===== END ADIL ACADEMY HOME V42 ===== */
+
+/* ADIL_TOTAL_AVAILABLE_BALANCE_V48 */
+.admin-total-balance-bar {
+  position: relative;
+  overflow: hidden;
+  margin-top: 25px;
+  padding: 22px 24px 15px;
+  border: 1px solid rgba(236, 190, 83, 0.24);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 82% -20%, rgba(139, 255, 85, 0.10), transparent 34%),
+    radial-gradient(circle at 0 100%, rgba(236, 190, 83, 0.09), transparent 38%),
+    var(--dash-card);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.14);
+}
+.admin-total-balance-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(236, 190, 83, .86), rgba(139, 255, 85, .66), transparent);
+}
+.admin-total-balance-main {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.admin-total-balance-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(236, 190, 83, .24);
+  border-radius: 16px;
+  color: #f2c763;
+  background: rgba(236, 190, 83, .08);
+}
+.admin-total-balance-icon svg { width: 24px; height: 24px; }
+.admin-total-balance-main h3 { margin: 4px 0 2px; font-size: 14px; letter-spacing: .035em; }
+.admin-total-balance-main strong { display: block; margin-top: 3px; color: #f7d475; font-size: clamp(28px, 3.3vw, 42px); line-height: 1.08; letter-spacing: -.025em; }
+.admin-total-balance-main small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; }
+.admin-total-balance-breakdown {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+.admin-total-balance-breakdown > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.055);
+  border-radius: 11px;
+  background: rgba(255,255,255,.018);
+}
+.admin-total-balance-breakdown span,
+.admin-total-balance-breakdown strong { display: block; }
+.admin-total-balance-breakdown span { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-total-balance-breakdown strong { margin-top: 5px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-total-balance-breakdown .money-in { color: #8bff75; }
+.admin-total-balance-breakdown .admin-balance-payout { border-color: rgba(255, 116, 116, .12); background: rgba(255, 90, 90, .025); }
+.admin-total-balance-breakdown .admin-balance-payout strong { color: #ff9b9b; }
+.admin-total-balance-note { margin: 11px 2px 0; color: #647168; font-size: 8px; line-height: 1.5; }
+.dashboard-theme-light .admin-total-balance-bar {
+  border-color: rgba(177, 128, 27, .24);
+  background: radial-gradient(circle at 82% -20%, rgba(40, 160, 70, .09), transparent 34%), radial-gradient(circle at 0 100%, rgba(214, 161, 47, .08), transparent 38%), #fff;
+}
+.dashboard-theme-light .admin-total-balance-main strong { color: #8c6512; }
+.dashboard-theme-light .admin-total-balance-breakdown > div { border-color: #e6ece7; background: #f8faf8; }
+.dashboard-theme-light .admin-total-balance-note { color: #718077; }
+@media (max-width: 1050px) {
+  .admin-total-balance-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .admin-total-balance-bar { padding: 18px 16px 14px; }
+  .admin-total-balance-main { align-items: flex-start; }
+  .admin-total-balance-icon { flex-basis: 44px; width: 44px; height: 44px; border-radius: 13px; }
+  .admin-total-balance-main strong { font-size: 27px; }
+  .admin-total-balance-breakdown { grid-template-columns: 1fr; }
+}

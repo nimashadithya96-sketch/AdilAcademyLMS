@@ -1231,78 +1231,78 @@ function HomePage() {
     <div className="academy-home">
       <AcademyPublicHeader />
       <main>
-        <section className="academy-hero">
-          <div className="academy-hero-glow academy-hero-glow-one" />
-          <div className="academy-hero-glow academy-hero-glow-two" />
-          <div className="section-shell academy-hero-shell">
-            <div className="academy-hero-copy">
-              <span className="academy-kicker">PRACTICAL ONLINE EDUCATION • SRI LANKA</span>
-              <h1 className="academy-hero-title">
-                <span>Learn Today.</span>
-                <span className="academy-hero-title-accent">Grow Every Day.</span>
-                <span>Build Your Future.</span>
+        <section className="academy-hero aa49-hero">
+          {/* ADIL_HOME_V49_UI_ONLY */}
+          <div className="aa49-hero-grid" />
+          <div className="aa49-hero-orb aa49-orb-one" />
+          <div className="aa49-hero-orb aa49-orb-two" />
+
+          <div className="section-shell aa49-hero-main">
+            <div className="aa49-hero-copy">
+              <span className="aa49-kicker">LEARN • PRACTICE • GROW • SUCCEED</span>
+              <h1>
+                Build Skills for
+                <span>Your Future</span>
               </h1>
-              <p>Practical, structured online learning designed to build real-world skills in technology, digital finance, ICT and Korean language.</p>
-              <div className="academy-hero-actions">
-                <a className="button button-primary" href="#available-courses">
-                  පාඨමාලා බලන්න <ArrowRight size={18} />
+              <p>
+                Practical online learning in Crypto Trading, Information Technology and EPS-TOPIK Korean —
+                built around structured lessons, secure access and clear progress.
+              </p>
+
+              <div className="aa49-hero-actions">
+                <a className="button button-primary aa49-gold-button" href="#available-courses">
+                  Explore Courses <ArrowRight size={18} />
                 </a>
-                <Link className="button button-secondary" to="/login">
-                  <GraduationCap size={18} /> Student portal
+                <Link className="button button-secondary aa49-login-button" to="/login">
+                  <GraduationCap size={18} /> Student Login
                 </Link>
               </div>
-              <div className="academy-trust-row" aria-label="Platform benefits">
-                <span><Check size={16} /> Structured learning</span>
-                <span><ShieldCheck size={16} /> Secure access</span>
-                <span><TrendingUp size={16} /> Progress tracking</span>
+
+              <div className="aa49-trust-line">
+                <span><Check size={15} /> Structured lessons</span>
+                <span><ShieldCheck size={15} /> Secure student portal</span>
+                <span><TrendingUp size={15} /> Progress tracking</span>
               </div>
             </div>
 
-            <div className="academy-hub-card">
-              <div className="academy-hub-orbit academy-hub-orbit-one" />
-              <div className="academy-hub-orbit academy-hub-orbit-two" />
-              <div className="academy-hub-header">
-                <div>
-                  <span>ADIL ACADEMY</span>
-                  <h2>Explore Our Courses</h2>
-                </div>
-                <div className="academy-hub-icon"><BookOpen size={24} /></div>
+            <div className="aa49-hero-visual" aria-label="Adil Academy online learning">
+              <div className="aa49-image-frame">
+                <img src="/adil-home-hero-v49.jpg" alt="Student learning online with Adil Academy" />
+                <div className="aa49-image-shade" />
               </div>
-              <div className="academy-hub-list">
-              {publicCourses.length ? (
-                publicCourses.map((course, index) => (
-                  <button
-                    type="button"
-                    className="academy-hub-course"
-                    key={course.id}
-                    onClick={() => setSelectedCourse(course)}
-                  >
-                    <span className="academy-hub-number">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-
-                    <span className="academy-hub-course-copy">
-                      <strong>{course.title}</strong>
-                      <small>
-                        {course.currency} {Number(course.price).toLocaleString()}
-                      </small>
-                    </span>
-
-                    <ArrowRight size={18} />
-                  </button>
-                ))
-              ) : (
-                <div className="academy-hub-empty">
-                  <strong>No courses available yet.</strong>
-                </div>
-              )}
-            </div>
-
-            <div className="academy-hub-footer">
-                <span><span className="academy-live-dot" /> Learning platform online</span>
-                {publicCourses.length > 0 && <strong>{publicCourses.length} course{publicCourses.length === 1 ? "" : "s"}</strong>}
+              <div className="aa49-floating-chip aa49-chip-top">
+                <span>ADIL ACADEMY</span>
+                <strong>Future-ready learning</strong>
+              </div>
+              <div className="aa49-floating-chip aa49-chip-bottom">
+                <span>COURSE AREAS</span>
+                <strong>Crypto • ICT • EPS-TOPIK</strong>
               </div>
             </div>
+          </div>
+
+          <div className="section-shell aa49-feature-strip">
+            <article className="aa49-feature-card aa49-feature-green">
+              <div><BookOpen size={27} /></div>
+              <span>
+                <strong>Practical Learning</strong>
+                <small>Step-by-step lessons focused on useful, real-world skills.</small>
+              </span>
+            </article>
+            <article className="aa49-feature-card aa49-feature-orange">
+              <div><GraduationCap size={27} /></div>
+              <span>
+                <strong>Flexible Learning</strong>
+                <small>Study online through your student account at your own pace.</small>
+              </span>
+            </article>
+            <article className="aa49-feature-card aa49-feature-purple">
+              <div><Headphones size={27} /></div>
+              <span>
+                <strong>Learning Support</strong>
+                <small>A structured course journey with guidance when you need it.</small>
+              </span>
+            </article>
           </div>
         </section>
 
@@ -1310,9 +1310,9 @@ function HomePage() {
           <div className="section-shell academy-section-shell">
             <div className="academy-section-heading">
               <div>
-                <span className="academy-eyebrow">COURSE CATALOG</span>
-                <h2>ඔබට ගැළපෙන පාඨමාලාව සොයාගන්න</h2>
-                <p>Admin විසින් publish කරන සියලු පාඨමාලා මෙහි ස්වයංක්‍රීයව පෙන්වයි.</p>
+                <span className="academy-eyebrow">OUR COURSES</span>
+                <h2>Popular Learning Categories</h2>
+                <p>Explore the courses currently published by Adil Academy and choose the learning path that matches your goals.</p>
               </div>
               <label className="academy-course-search">
                 <Search size={20} />

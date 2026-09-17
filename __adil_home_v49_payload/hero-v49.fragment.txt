@@ -1,0 +1,75 @@
+        <section className="academy-hero aa49-hero">
+          {/* ADIL_HOME_V49_UI_ONLY */}
+          <div className="aa49-hero-grid" />
+          <div className="aa49-hero-orb aa49-orb-one" />
+          <div className="aa49-hero-orb aa49-orb-two" />
+
+          <div className="section-shell aa49-hero-main">
+            <div className="aa49-hero-copy">
+              <span className="aa49-kicker">LEARN • PRACTICE • GROW • SUCCEED</span>
+              <h1>
+                Build Skills for
+                <span>Your Future</span>
+              </h1>
+              <p>
+                Practical online learning in Crypto Trading, Information Technology and EPS-TOPIK Korean —
+                built around structured lessons, secure access and clear progress.
+              </p>
+
+              <div className="aa49-hero-actions">
+                <a className="button button-primary aa49-gold-button" href="#available-courses">
+                  Explore Courses <ArrowRight size={18} />
+                </a>
+                <Link className="button button-secondary aa49-login-button" to="/login">
+                  <GraduationCap size={18} /> Student Login
+                </Link>
+              </div>
+
+              <div className="aa49-trust-line">
+                <span><Check size={15} /> Structured lessons</span>
+                <span><ShieldCheck size={15} /> Secure student portal</span>
+                <span><TrendingUp size={15} /> Progress tracking</span>
+              </div>
+            </div>
+
+            <div className="aa49-hero-visual" aria-label="Adil Academy online learning">
+              <div className="aa49-image-frame">
+                <img src="/adil-home-hero-v49.jpg" alt="Student learning online with Adil Academy" />
+                <div className="aa49-image-shade" />
+              </div>
+              <div className="aa49-floating-chip aa49-chip-top">
+                <span>ADIL ACADEMY</span>
+                <strong>Future-ready learning</strong>
+              </div>
+              <div className="aa49-floating-chip aa49-chip-bottom">
+                <span>COURSE AREAS</span>
+                <strong>Crypto • ICT • EPS-TOPIK</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="section-shell aa49-feature-strip">
+            <article className="aa49-feature-card aa49-feature-green">
+              <div><BookOpen size={27} /></div>
+              <span>
+                <strong>Practical Learning</strong>
+                <small>Step-by-step lessons focused on useful, real-world skills.</small>
+              </span>
+            </article>
+            <article className="aa49-feature-card aa49-feature-orange">
+              <div><GraduationCap size={27} /></div>
+              <span>
+                <strong>Flexible Learning</strong>
+                <small>Study online through your student account at your own pace.</small>
+              </span>
+            </article>
+            <article className="aa49-feature-card aa49-feature-purple">
+              <div><Headphones size={27} /></div>
+              <span>
+                <strong>Learning Support</strong>
+                <small>A structured course journey with guidance when you need it.</small>
+              </span>
+            </article>
+          </div>
+        </section>
+

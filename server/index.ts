@@ -29,7 +29,8 @@ import { apiErrorHandler } from "./lib/http";
 import { courseRouter } from "./modules/courses/routes";
 import { revisionRouter } from "./modules/revision/routes"; // ADIL_REVISION_MANAGER_V45
 import { revisionStudentRouter } from "./modules/revision/student-routes"; // ADIL_STUDENT_REVISION_V46
-import { halfPaymentAdminRouter } from "./modules/platform/half-payment-students"; // ADIL_HALF_PAYMENT_STUDENTS_V47
+import { halfPaymentAdminRouter } from "./modules/platform/half-payment-students";
+import { adminAdmissionHeroesRouter } from "./modules/admin/admission-heroes"; // ADIL_ADMIN_ADMISSION_HEROES_V50 // ADIL_HALF_PAYMENT_STUDENTS_V47
 import { lessonQandARouter } from "./modules/courses/lesson-q-and-a";
 import { paymentRouter } from "./modules/payments/routes";
 import { consultantRouter } from "./modules/consultants/routes";
@@ -580,6 +581,7 @@ app.use("/api", halfPaymentAdminRouter);
 app.use("/api", platformRouter);
 app.use("/api", supportRouter);
 app.use("/api", ccoMainRouter);
+app.use("/api", adminAdmissionHeroesRouter);
 app.use("/api", (_request, response) => {
   response
     .status(404)

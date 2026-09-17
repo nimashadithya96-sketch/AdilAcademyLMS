@@ -1,0 +1,235 @@
+
+/* ADIL ACADEMY — ADMIN ADMISSION HEROES v50 */
+.admin-admission-heroes{
+  margin-top:16px;
+  overflow:hidden;
+  position:relative;
+}
+.admin-admission-heroes:before{
+  content:"";
+  position:absolute;
+  width:270px;
+  height:270px;
+  right:-120px;
+  top:-160px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(246,198,73,.13),transparent 68%);
+  pointer-events:none;
+}
+.admin-heroes-heading{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+}
+.admin-heroes-heading h2{
+  margin:7px 0 5px;
+  font-size:24px;
+}
+.admin-heroes-heading p{
+  max-width:720px;
+  margin:0;
+  color:var(--muted);
+  line-height:1.6;
+}
+.admin-heroes-emblem{
+  width:58px;
+  height:58px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(246,198,73,.28);
+  border-radius:18px;
+  color:#f4c85a;
+  background:linear-gradient(145deg,rgba(246,198,73,.12),rgba(255,255,255,.02));
+  box-shadow:0 18px 45px rgba(0,0,0,.16);
+}
+.admin-heroes-emblem svg{
+  width:28px;
+  height:28px;
+}
+.admin-heroes-tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:20px 0 14px;
+}
+.admin-heroes-tabs button{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:39px;
+  padding:0 13px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:rgba(255,255,255,.015);
+  color:var(--muted);
+  font:inherit;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+}
+.admin-heroes-tabs button:hover{
+  color:var(--text);
+  border-color:rgba(246,198,73,.28);
+}
+.admin-heroes-tabs button.active{
+  color:#1c1608;
+  border-color:#f4c85a;
+  background:linear-gradient(135deg,#ffe27b,#eeb63c);
+  box-shadow:0 8px 24px rgba(238,182,60,.12);
+}
+.admin-heroes-list{
+  display:grid;
+  gap:8px;
+}
+.admin-hero-row{
+  display:grid;
+  grid-template-columns:48px 48px minmax(180px,1fr) 72px 72px minmax(120px,auto);
+  gap:12px;
+  align-items:center;
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:linear-gradient(135deg,rgba(255,255,255,.025),rgba(255,255,255,.008));
+  transition:.18s ease;
+}
+.admin-hero-row:hover{
+  transform:translateY(-1px);
+  border-color:rgba(246,198,73,.28);
+}
+.admin-hero-row.rank-gold{
+  border-color:rgba(246,198,73,.38);
+  background:linear-gradient(135deg,rgba(246,198,73,.09),rgba(255,255,255,.012));
+}
+.admin-hero-row.rank-silver{
+  border-color:rgba(196,206,219,.25);
+}
+.admin-hero-row.rank-bronze{
+  border-color:rgba(212,142,78,.28);
+}
+.admin-hero-rank{
+  font-size:16px;
+  font-weight:900;
+  color:#e8bd52;
+}
+.admin-hero-avatar{
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  object-fit:cover;
+  border:2px solid rgba(246,198,73,.26);
+}
+.admin-hero-avatar-fallback{
+  display:grid;
+  place-items:center;
+  background:rgba(246,198,73,.08);
+  color:#f2c960;
+  font-size:12px;
+  font-weight:900;
+}
+.admin-hero-person{
+  display:grid;
+  gap:3px;
+  min-width:0;
+}
+.admin-hero-person strong{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+}
+.admin-hero-person small{
+  color:var(--muted);
+}
+.admin-hero-mini{
+  display:grid;
+  gap:2px;
+  text-align:center;
+}
+.admin-hero-mini span{
+  color:var(--muted);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.09em;
+}
+.admin-hero-mini strong{
+  font-size:16px;
+}
+.admin-hero-score{
+  display:grid;
+  gap:3px;
+  text-align:right;
+}
+.admin-hero-score strong{
+  color:var(--green);
+  font-size:14px;
+}
+.admin-hero-score small{
+  color:var(--muted);
+}
+.admin-heroes-empty,
+.admin-heroes-loading{
+  min-height:150px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:7px;
+  padding:24px;
+  border:1px dashed var(--line);
+  border-radius:14px;
+  color:var(--muted);
+  text-align:center;
+}
+.admin-heroes-empty svg,
+.admin-heroes-loading svg{
+  color:#e8bd52;
+}
+.admin-heroes-empty strong{
+  color:var(--text);
+}
+@media(max-width:850px){
+  .admin-hero-row{
+    grid-template-columns:36px 44px minmax(0,1fr) 58px 58px;
+  }
+  .admin-hero-score{
+    grid-column:3/-1;
+    padding-top:8px;
+    border-top:1px solid rgba(255,255,255,.05);
+    text-align:left;
+  }
+}
+@media(max-width:600px){
+  .admin-heroes-heading{
+    align-items:flex-start;
+  }
+  .admin-heroes-emblem{
+    width:48px;
+    height:48px;
+  }
+  .admin-heroes-tabs{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  .admin-heroes-tabs button{
+    justify-content:center;
+  }
+  .admin-hero-row{
+    grid-template-columns:34px 42px minmax(0,1fr);
+  }
+  .admin-hero-mini{
+    display:none;
+  }
+  .admin-hero-score{
+    grid-column:2/-1;
+  }
+}
+.dashboard-theme-light .admin-hero-row{
+  background:#fff;
+  border-color:#bfd0c2;
+}
+.dashboard-theme-light .admin-heroes-tabs button{
+  color:#34483b;
+}
+.dashboard-theme-light .admin-heroes-tabs button.active{
+  color:#2c2207;
+}

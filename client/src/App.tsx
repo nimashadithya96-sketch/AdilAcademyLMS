@@ -62,7 +62,8 @@ import type {
 import { sriLankaLocations, sriLankaProvinces } from "./sri-lanka-locations";
 import RevisionAdminManager from "./RevisionAdminManager"; // ADIL_REVISION_MANAGER_V45
 import StudentRevisionCenter from "./StudentRevisionCenter"; // ADIL_STUDENT_REVISION_V46
-import HalfPaymentStudentsWorkspace from "./HalfPaymentStudentsWorkspace"; // ADIL_HALF_PAYMENT_STUDENTS_V47
+import HalfPaymentStudentsWorkspace from "./HalfPaymentStudentsWorkspace";
+import AdminAdmissionHeroesPanel from "./AdminAdmissionHeroesPanel"; // ADIL_ADMIN_ADMISSION_HEROES_V50 // ADIL_HALF_PAYMENT_STUDENTS_V47
 
 const courseModules = [
   {
@@ -2416,6 +2417,7 @@ function AdminDashboard({ onOpen }: { onOpen: (module: string) => void }) {
         <MetricCard label="Consultants" value={String(overview.consultants)} note="Click to view & search" icon={<Network />} onClick={() => onOpen("Consultants")} />
         <MetricCard label="Active Accounts" value={String(overview.activeAccounts)} note="Click to search SR/CN" icon={<UserCheck />} onClick={() => onOpen("Network")} />
       </div>
+            <AdminAdmissionHeroesPanel />
       <div className="dashboard-grid">
         <section className="dash-card">
           <div className="dash-card-heading"><div><span className="eyebrow">REAL-TIME DATA</span><h3>Latest payments</h3></div></div>

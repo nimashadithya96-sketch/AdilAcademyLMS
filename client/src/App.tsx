@@ -64,6 +64,7 @@ import RevisionAdminManager from "./RevisionAdminManager"; // ADIL_REVISION_MANA
 import StudentRevisionCenter from "./StudentRevisionCenter"; // ADIL_STUDENT_REVISION_V46
 import HalfPaymentStudentsWorkspace from "./HalfPaymentStudentsWorkspace";
 import AdminAdmissionHeroesPanel from "./AdminAdmissionHeroesPanel"; // ADIL_ADMIN_ADMISSION_HEROES_V50 // ADIL_HALF_PAYMENT_STUDENTS_V47
+import StudentLearningAnalyticsWorkspace from "./StudentLearningAnalyticsWorkspace"; // ADIL_STUDENT_LEARNING_ANALYTICS_V52
 
 const courseModules = [
   {
@@ -1982,6 +1983,7 @@ const dashboardNav: Record<
     { label: "Course", icon: <BookOpen /> },
     { label: "Revision Manager", icon: <GraduationCap /> },
     { label: "Students", icon: <Users /> },
+    { label: "Student Learning Analytics", icon: <BarChart3 /> }, // ADIL_STUDENT_LEARNING_ANALYTICS_V52
     { label: "Half Payment Students", icon: <Wallet /> },
     { label: "Payments", icon: <CreditCard /> },
     { label: "CCO Activations", icon: <UserCheck /> },
@@ -4396,6 +4398,7 @@ function FeatureWorkspace({
   if (role === "admin" && module === "CCO Activations") return <AdminCcoActivationWorkspace />;
   if (role === "admin" && module === "CCO Main Buy") return <AdminCcoMainBuyWorkspace />;
   if (role === "admin" && module === "Half Payment Students") return <HalfPaymentStudentsWorkspace />;
+  if (role === "admin" && module === "Student Learning Analytics") return <StudentLearningAnalyticsWorkspace />; // ADIL_STUDENT_LEARNING_ANALYTICS_V52
   if (role === "admin" && ["Students", "Payments", "Consultants", "Network"].includes(module)) return <AdminFeatureWorkspace module={module} />;
   const data = workspaceData[role + ":" + module];
   if (!data) {

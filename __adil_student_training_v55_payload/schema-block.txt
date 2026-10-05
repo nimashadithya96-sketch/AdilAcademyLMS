@@ -1,0 +1,14 @@
+
+
+// ADIL_STUDENT_TRAINING_V55: public pre-application student onboarding videos managed by Admin.
+export const studentTrainingVideos = pgTable("student_training_videos", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  videoProvider: text("video_provider").default("youtube").notNull(),
+  videoId: text("video_id").notNull(),
+  position: integer("position").notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});

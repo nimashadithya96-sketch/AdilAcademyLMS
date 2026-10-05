@@ -32,6 +32,7 @@ import { revisionStudentRouter } from "./modules/revision/student-routes"; // AD
 import { halfPaymentAdminRouter } from "./modules/platform/half-payment-students";
 import { adminAdmissionHeroesRouter } from "./modules/admin/admission-heroes"; // ADIL_ADMIN_ADMISSION_HEROES_V50 // ADIL_HALF_PAYMENT_STUDENTS_V47
 import { adminStudentLearningAnalyticsRouter } from "./modules/admin/student-learning-analytics"; // ADIL_STUDENT_LEARNING_ANALYTICS_V52
+import { presenceRouter } from "./modules/presence/routes"; // ADIL_LIVE_ONLINE_V54
 import { lessonQandARouter } from "./modules/courses/lesson-q-and-a";
 import { paymentRouter } from "./modules/payments/routes";
 import { consultantRouter } from "./modules/consultants/routes";
@@ -40,6 +41,8 @@ import { startFridayCommissionScheduler } from "./modules/commissions/scheduler"
 import { platformRouter } from "./modules/platform/routes";
 import { supportRouter } from "./modules/support/routes";
 import { ccoMainRouter } from "./modules/cco-main/routes";
+import { ccoSetupGuideRouter } from "./modules/cco-setup-guide/routes"; // ADIL_CCO_SETUP_GUIDE_V53
+import { studentTrainingRouter } from "./modules/student-training/routes"; // ADIL_STUDENT_TRAINING_V55
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -582,8 +585,11 @@ app.use("/api", halfPaymentAdminRouter);
 app.use("/api", platformRouter);
 app.use("/api", supportRouter);
 app.use("/api", ccoMainRouter);
+app.use("/api", ccoSetupGuideRouter); // ADIL_CCO_SETUP_GUIDE_V53
+app.use("/api", studentTrainingRouter); // ADIL_STUDENT_TRAINING_V55
 app.use("/api", adminAdmissionHeroesRouter);
 app.use("/api", adminStudentLearningAnalyticsRouter);
+app.use("/api", presenceRouter); // ADIL_LIVE_ONLINE_V54
 app.use("/api", (_request, response) => {
   response
     .status(404)

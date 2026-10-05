@@ -4,3 +4,18 @@ dist-server/
 .env
 .DS_Store
 *.log
+
+# ADIL ACADEMY - do not upload private/local files
+*.zip
+*.dump
+.env
+.env.*
+backup/
+node_modules/
+dist/
+dist-server/
+.cache/
+.local/
+.upm/
+.agents/
+.codex/

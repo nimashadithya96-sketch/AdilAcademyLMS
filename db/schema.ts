@@ -1047,3 +1047,42 @@ export const revisionVideoProgress = pgTable(
   },
   (table) => [uniqueIndex("revision_video_progress_user_video_unique").on(table.userId, table.videoId)]
 );
+
+
+// ADIL_CCO_SETUP_GUIDE_V53: public consultant setup videos managed by Admin.
+export const ccoSetupGuideVideos = pgTable("cco_setup_guide_videos", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  videoProvider: text("video_provider").default("youtube").notNull(),
+  videoId: text("video_id").notNull(),
+  position: integer("position").notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+
+// ADIL_LIVE_ONLINE_V54: latest visible browser heartbeat for Students and Consultants.
+export const userPresence = pgTable("user_presence", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  onlineSinceAt: timestamp("online_since_at", { withTimezone: true }).defaultNow().notNull(),
+  currentModule: text("current_module"),
+  portalMode: text("portal_mode"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+
+// ADIL_STUDENT_TRAINING_V55: public pre-application student onboarding videos managed by Admin.
+export const studentTrainingVideos = pgTable("student_training_videos", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  videoProvider: text("video_provider").default("youtube").notNull(),
+  videoId: text("video_id").notNull(),
+  position: integer("position").notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});

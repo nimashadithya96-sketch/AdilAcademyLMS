@@ -65,6 +65,11 @@ import StudentRevisionCenter from "./StudentRevisionCenter"; // ADIL_STUDENT_REV
 import HalfPaymentStudentsWorkspace from "./HalfPaymentStudentsWorkspace";
 import AdminAdmissionHeroesPanel from "./AdminAdmissionHeroesPanel"; // ADIL_ADMIN_ADMISSION_HEROES_V50 // ADIL_HALF_PAYMENT_STUDENTS_V47
 import StudentLearningAnalyticsWorkspace from "./StudentLearningAnalyticsWorkspace"; // ADIL_STUDENT_LEARNING_ANALYTICS_V52
+import LiveOnlineUsersWorkspace from "./LiveOnlineUsersWorkspace"; // ADIL_LIVE_ONLINE_V54
+import CcoSetupGuidePage from "./CcoSetupGuidePage"; // ADIL_CCO_SETUP_GUIDE_V53
+import CcoTrainingVideosWorkspace from "./CcoTrainingVideosWorkspace"; // ADIL_CCO_SETUP_GUIDE_V53
+import StudentGettingStartedPage from "./StudentGettingStartedPage"; // ADIL_STUDENT_TRAINING_V55
+import TrainingVideosWorkspace from "./TrainingVideosWorkspace"; // ADIL_STUDENT_TRAINING_V55
 
 const courseModules = [
   {
@@ -1420,7 +1425,7 @@ function HomePage() {
               <span className="academy-eyebrow">HOW IT WORKS</span>
               <h2>ඔබේ learning journey එක steps තුනකින් අරඹන්න</h2>
               <p>Choose your course, submit your application, complete verification, and begin learning through your secure student portal.</p>
-              <Link className="button button-primary" to="/login">
+              <Link className="button button-primary" to="/student-getting-started">
                 Start your application <ArrowRight size={18} />
               </Link>
             </div>
@@ -1619,7 +1624,7 @@ function CcoMainApplicationPage() {
   async function validate(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); setError(""); try { const response=await fetch("/api/public/cco-main/validate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({payId})}); const data=await response.json(); if(!response.ok)throw new Error(data.message||"Pay ID invalid."); setValidated(data); } catch(e){setError(e instanceof Error?e.message:"Pay ID validate කළ නොහැක.")} finally{setBusy(false)} }
   async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form=new FormData(event.currentTarget); const slip=form.get("proof") as File; if(!slip?.size){setError("Bank slip එක තෝරන්න.");return} setBusy(true);setError("");try{const body=Object.fromEntries(Array.from(form.entries()).filter(([key])=>key!=="proof"));const response=await fetch("/api/public/cco-main/applications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...body,payId})});const data=await response.json();if(!response.ok)throw new Error(data.message||"Application submit failed.");const proof=await fetch(`/api/public/cco-main/applications/${data.applicationId}/proof`,{method:"PUT",headers:{"Content-Type":slip.type,"X-Registration-Token":data.registrationToken},body:slip});const result=await proof.json();if(!proof.ok)throw new Error(result.message||"Slip upload failed.");setMessage(`✓ Application submitted successfully. Reserved account: ${data.accountNumber}. Admin payment slip එක check කර නිවැරදි නම් පැය 24ක් ඇතුළත email එකට OTP code එකක් එවනු ඇත. OTP ලැබුණු පසු Login → Verify OTP වෙත ගොස් OTP සහ නව password එක ඇතුළත් කරන්න.`)}catch(e){setError(e instanceof Error?e.message:"Application submit failed.")}finally{setBusy(false)}}
   const names=validated?.name.trim().split(/\s+/)??[];
-  return <div className="cco-main-public"><PublicHeader/><main className="section-shell"><div className="cco-main-intro"><span className="pill"><UserCheck/> COURSE-INDEPENDENT CONSULTING</span><h1>CCO Main Account</h1><p>Course එකකට සම්බන්ධ නොවී Adil Academy consultant කෙනෙකු වීමට Admin ලබාදුන් special Pay ID එක භාවිත කරන්න.</p></div>{message?<section className="cco-main-success"><Check/><h2>Submission successful</h2><p>{message}</p><Link className="button button-primary" to="/login">Verify OTP / Login <ArrowRight/></Link></section>:!validated?<form className="cco-main-card" onSubmit={validate}><span className="eyebrow">STEP 01</span><h2>Special Pay ID verify කරන්න</h2><label>CCO Main Pay ID<input value={payId} onChange={e=>setPayId(e.target.value.toUpperCase())} placeholder="CCO-YYYYMMDD-XXXXXXXX" required/></label>{error&&<p className="form-error">{error}</p>}<button className="button button-primary" disabled={busy}>{busy?"Checking...":"Continue"}<ArrowRight/></button></form>:<form className="cco-main-card cco-main-details" onSubmit={submit}><div><span className="eyebrow">STEP 02</span><h2>Consultant details & payment proof</h2><p><strong>{payId}</strong> · Required amount: <strong>Rs. {validated.amount.toLocaleString()}</strong></p></div><div className="cco-form-grid"><label>First name<input name="firstName" defaultValue={names[0]??""} required/></label><label>Last name<input name="lastName" defaultValue={names.slice(1).join(" ")} required/></label><label>Email<input name="email" type="email" value={validated.email} readOnly/></label><label>Phone<input name="phone" defaultValue={validated.phone} required/></label><label>Date of birth<input name="dateOfBirth" type="date" required/></label><label>NIC / Passport<input name="nicOrPassport" required/></label><label className="wide">Address line 1<input name="addressLine1" required/></label><label className="wide">Address line 2<input name="addressLine2"/></label><label>Province<input name="province" required/></label><label>District<input name="district" required/></label><label>City<input name="city" required/></label><label>Bank reference<input name="transactionReference" value={payId} readOnly/></label><label className="wide">Bank slip (JPG, PNG, WebP or PDF)<input name="proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required/></label></div>{error&&<p className="form-error">{error}</p>}<button className="button button-primary" disabled={busy}>{busy?"Submitting...":"Submit CCO Main application"}<ArrowRight/></button></form>}</main></div>;
+  return <div className="cco-main-public"><PublicHeader/><main className="section-shell"><div className="cco-main-intro"><span className="pill"><UserCheck/> COURSE-INDEPENDENT CONSULTING</span><h1>CCO Main Account</h1><p>Course එකකට සම්බන්ධ නොවී Adil Academy consultant කෙනෙකු වීමට Admin ලබාදුන් special Pay ID එක භාවිත කරන්න.</p></div>{message?<section className="cco-main-success"><Check/><h2>Submission successful</h2><p>{message}</p><Link className="button button-primary" to="/login">Verify OTP / Login <ArrowRight/></Link></section>:!validated?<form className="cco-main-card" onSubmit={validate}><span className="eyebrow">STEP 01</span><h2>Special Pay ID verify කරන්න</h2><label>CCO Main Pay ID<input value={payId} onChange={e=>setPayId(e.target.value.toUpperCase())} placeholder="CCO-YYYYMMDD-XXXXXXXX" required/></label>{error&&<p className="form-error">{error}</p>}<button className="button button-primary" disabled={busy}>{busy?"Checking...":"Continue"}<ArrowRight/></button></form>:<form className="cco-main-card cco-main-details" onSubmit={submit}><div><span className="eyebrow">STEP 02</span><h2>Consultant details & payment proof</h2><p><strong>{payId}</strong> · Required amount: <strong>Rs. {validated.amount.toLocaleString()}</strong></p></div><div className="cco-form-grid"><label>First name<input name="firstName" defaultValue={names[0]??""} required/></label><label>Last name<input name="lastName" defaultValue={names.slice(1).join(" ")} required/></label><label>Email<input name="email" type="email" value={validated.email} readOnly/></label><label>Phone<input name="phone" defaultValue={validated.phone} required/></label><label>Date of birth<input name="dateOfBirth" type="date" required/></label><label>NIC / Passport<input name="nicOrPassport" required/></label><label className="wide">Address line 1<input name="addressLine1" required/></label><label className="wide">Address line 2<input name="addressLine2"/></label><label>Province<input name="province" required/></label><label>District<input name="district" required/></label><label>City<input name="city" required/></label><label>Bank reference<input name="transactionReference" value={payId} readOnly/></label><label className="wide">Bank slip (JPG, PNG, WebP or PDF)<input name="proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required/></label></div>{error&&<p className="form-error">{error}</p>}<button className="button button-primary" disabled={busy}>{busy?"Submitting...":"Submit CCO Main application"}<ArrowRight/></button></form>}<section className="cco-setup-entry-card">{/* ADIL_CCO_SETUP_GUIDE_V53 */}<div className="cco-setup-entry-icon"><GraduationCap /></div><div className="cco-setup-entry-copy"><span className="eyebrow">CONSULTANT STARTUP TRAINING</span><h2>CCO Setup Guide</h2><p>CCO account එක නිවැරදිව open සහ setup කරගන්න step-by-step video guide එක බලන්න.</p></div><Link className="button button-ghost" to="/cco-main/setup-guide">Open Setup Guide <ArrowRight /></Link></section></main></div>;
 }
 
 const roleOptions: {
@@ -1984,10 +1989,12 @@ const dashboardNav: Record<
     { label: "Revision Manager", icon: <GraduationCap /> },
     { label: "Students", icon: <Users /> },
     { label: "Student Learning Analytics", icon: <BarChart3 /> }, // ADIL_STUDENT_LEARNING_ANALYTICS_V52
+    { label: "Live Online", icon: <Users /> }, // ADIL_LIVE_ONLINE_V54
     { label: "Half Payment Students", icon: <Wallet /> },
     { label: "Payments", icon: <CreditCard /> },
     { label: "CCO Activations", icon: <UserCheck /> },
     { label: "CCO Main Buy", icon: <CircleDollarSign /> },
+    { label: "Training Videos", icon: <GraduationCap /> }, // ADIL_CCO_SETUP_GUIDE_V53 // ADIL_STUDENT_TRAINING_V55
     { label: "Network", icon: <Network /> },
     { label: "Commissions", icon: <CircleDollarSign /> },
     { label: "Settings", icon: <Settings /> }
@@ -4397,8 +4404,10 @@ function FeatureWorkspace({
   if (role === "admin" && module === "Commissions") return <AdminCommissionWorkspace />;
   if (role === "admin" && module === "CCO Activations") return <AdminCcoActivationWorkspace />;
   if (role === "admin" && module === "CCO Main Buy") return <AdminCcoMainBuyWorkspace />;
+  if (role === "admin" && module === "Training Videos") return <TrainingVideosWorkspace VideoPlayer={ProtectedVideoPlayer} />; // ADIL_CCO_SETUP_GUIDE_V53 // ADIL_STUDENT_TRAINING_V55
   if (role === "admin" && module === "Half Payment Students") return <HalfPaymentStudentsWorkspace />;
   if (role === "admin" && module === "Student Learning Analytics") return <StudentLearningAnalyticsWorkspace />; // ADIL_STUDENT_LEARNING_ANALYTICS_V52
+  if (role === "admin" && module === "Live Online") return <LiveOnlineUsersWorkspace />; // ADIL_LIVE_ONLINE_V54
   if (role === "admin" && ["Students", "Payments", "Consultants", "Network"].includes(module)) return <AdminFeatureWorkspace module={module} />;
   const data = workspaceData[role + ":" + module];
   if (!data) {
@@ -4984,6 +4993,27 @@ function Dashboard({
     };
   }, [user.id, user.role]);
   const effectiveRole: UserRole = user.role === "consultant" && portalMode === "learning" ? "student" : user.role;
+  useEffect(() => { // ADIL_LIVE_ONLINE_V54
+    if (!["student", "consultant"].includes(user.role)) return;
+    const heartbeat = () => {
+      if (document.visibilityState !== "visible") return;
+      void fetch("/api/presence/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          module: activeModule,
+          portalMode: user.role === "consultant" ? (portalMode === "learning" ? "learning" : "consultant") : "student"
+        })
+      }).catch(() => undefined);
+    };
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 20_000);
+    document.addEventListener("visibilitychange", heartbeat);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", heartbeat);
+    };
+  }, [user.id, user.role, activeModule, portalMode]);
   const roleTitle = {
     student: "Student Dashboard",
     consultant: "Consultant Control Panel",
@@ -5121,7 +5151,9 @@ export default function App() {
     <><Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage onLogin={setUser} />} />
+      <Route path="/student-getting-started" element={<StudentGettingStartedPage PublicHeader={PublicHeader} VideoPlayer={ProtectedVideoPlayer} />} /> {/* ADIL_STUDENT_TRAINING_V55 */}
       <Route path="/cco-main" element={<CcoMainApplicationPage />} />
+      <Route path="/cco-main/setup-guide" element={<CcoSetupGuidePage PublicHeader={PublicHeader} VideoPlayer={ProtectedVideoPlayer} />} /> {/* ADIL_CCO_SETUP_GUIDE_V53 */}
       <Route
         path="/dashboard"
         element={

@@ -1,0 +1,14 @@
+
+
+// ADIL_CCO_SETUP_GUIDE_V53: public consultant setup videos managed by Admin.
+export const ccoSetupGuideVideos = pgTable("cco_setup_guide_videos", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  videoProvider: text("video_provider").default("youtube").notNull(),
+  videoId: text("video_id").notNull(),
+  position: integer("position").notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});

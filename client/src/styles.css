@@ -4967,3 +4967,7 @@ button {
   .aa49-chip-bottom{left:8px}
 }
 
+
+
+/* ADIL_FORGOT_PASSWORD_V57 — secure forgot-password flow */
+.forgot-password-link,.forgot-password-back{grid-column:1/-1;width:max-content;border:0;background:transparent;color:var(--green);padding:0;cursor:pointer;font:inherit;font-size:9px;font-weight:800}.forgot-password-link{justify-self:end;margin-top:-5px}.forgot-password-back{justify-self:start;margin-top:2px;color:#91a39a}.forgot-password-link:hover,.forgot-password-back:hover{color:#fff;text-decoration:underline}.auth-form input[readonly]{opacity:.72;cursor:not-allowed}@media(max-width:620px){.forgot-password-link{justify-self:start}}

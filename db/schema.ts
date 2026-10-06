@@ -1086,3 +1086,30 @@ export const studentTrainingVideos = pgTable("student_training_videos", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
+
+// ADIL_ADVANCE_REVISION_ZOOM_V56: direct Zoom live-class links for Advanced Revision only.
+export const revisionZoomSessions = pgTable("revision_zoom_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  courseId: uuid("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  zoomUrl: text("zoom_url").notNull(),
+  description: text("description"),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  durationMinutes: integer("duration_minutes").default(120).notNull(), // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+// ADIL_FORGOT_PASSWORD_V57
+export const passwordResetCodes = pgTable("password_reset_codes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  attempts: integer("attempts").default(0).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});

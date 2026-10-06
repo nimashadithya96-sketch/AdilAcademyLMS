@@ -6,7 +6,8 @@ import {
   auditLogs,
   courses,
   revisionSeries,
-  revisionVideos
+  revisionVideos,
+  revisionZoomSessions
 } from "../../../db/schema";
 import { HttpError, requireRole } from "../../lib/auth";
 import { asyncRoute } from "../../lib/http";
@@ -39,6 +40,34 @@ const videoUpdateSchema = z.object({
 }).refine((value) => Object.keys(value).length > 0, "No changes supplied.");
 const moveSchema = z.object({ direction: z.enum(["UP", "DOWN"]) });
 const seriesStatusSchema = z.object({ isComplete: z.boolean() });
+
+// ADIL_ADVANCE_REVISION_ZOOM_V56
+const zoomUrlSchema = z.string().trim().url().max(1500).refine((value) => {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:" && (host === "zoom.us" || host.endsWith(".zoom.us"));
+  } catch {
+    return false;
+  }
+}, "Enter a valid https:// Zoom meeting link.");
+const zoomSessionCreateSchema = z.object({
+  courseId: z.string().uuid(),
+  title: z.string().trim().min(2).max(180),
+  zoomUrl: zoomUrlSchema,
+  description: z.string().trim().max(5000).nullable().optional(),
+  scheduledAt: z.string().datetime().nullable().optional(),
+  durationMinutes: z.coerce.number().int().min(15).max(1440).default(120), // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+  isPublished: z.boolean().default(false)
+});
+const zoomSessionUpdateSchema = z.object({
+  title: z.string().trim().min(2).max(180).optional(),
+  zoomUrl: zoomUrlSchema.optional(),
+  description: z.string().trim().max(5000).nullable().optional(),
+  scheduledAt: z.string().datetime().nullable().optional(),
+  durationMinutes: z.coerce.number().int().min(15).max(1440).optional(), // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+  isPublished: z.boolean().optional()
+}).refine((value) => Object.keys(value).length > 0, "No changes supplied.");
 
 async function ensureSeries(
   db: ReturnType<typeof requireDatabase>,
@@ -359,5 +388,104 @@ revisionRouter.patch(
     });
 
     response.json({ series: updated });
+  })
+);
+
+
+// ADIL_ADVANCE_REVISION_ZOOM_V56: Admin manages direct Zoom live links for Advanced Revision.
+revisionRouter.get(
+  "/admin/revision/zoom-sessions",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin"]);
+    const input = courseQuerySchema.parse({ courseId: request.query.courseId });
+    const db = requireDatabase();
+    const sessions = await db
+      .select()
+      .from(revisionZoomSessions)
+      .where(eq(revisionZoomSessions.courseId, input.courseId))
+      .orderBy(asc(revisionZoomSessions.scheduledAt), asc(revisionZoomSessions.createdAt));
+    response.json({ sessions });
+  })
+);
+
+revisionRouter.post(
+  "/admin/revision/zoom-sessions",
+  asyncRoute(async (request, response) => {
+    const admin = await requireRole(request, ["admin"]);
+    const input = zoomSessionCreateSchema.parse(request.body);
+    const db = requireDatabase();
+    const [course] = await db.select({ id: courses.id }).from(courses).where(eq(courses.id, input.courseId)).limit(1);
+    if (!course) throw new HttpError(404, "Course not found.");
+
+    const [created] = await db.insert(revisionZoomSessions).values({
+      courseId: input.courseId,
+      title: input.title,
+      zoomUrl: input.zoomUrl,
+      description: input.description || null,
+      scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+      durationMinutes: input.durationMinutes, // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+      isPublished: input.isPublished
+    }).returning();
+
+    await db.insert(auditLogs).values({
+      actorUserId: admin.id,
+      action: "ADVANCE_REVISION_ZOOM_CREATED",
+      entityType: "REVISION_ZOOM_SESSION",
+      entityId: created.id,
+      metadata: { courseId: input.courseId, title: input.title, isPublished: input.isPublished }
+    });
+    response.status(201).json({ session: created });
+  })
+);
+
+revisionRouter.patch(
+  "/admin/revision/zoom-sessions/:id",
+  asyncRoute(async (request, response) => {
+    const admin = await requireRole(request, ["admin"]);
+    const input = zoomSessionUpdateSchema.parse(request.body);
+    const db = requireDatabase();
+    const sessionId = String(request.params.id);
+    const [existing] = await db.select().from(revisionZoomSessions).where(eq(revisionZoomSessions.id, sessionId)).limit(1);
+    if (!existing) throw new HttpError(404, "Zoom live class not found.");
+
+    const updateValues = {
+      ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(input.zoomUrl !== undefined ? { zoomUrl: input.zoomUrl } : {}),
+      ...(input.description !== undefined ? { description: input.description || null } : {}),
+      ...(input.scheduledAt !== undefined ? { scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null } : {}),
+      ...(input.durationMinutes !== undefined ? { durationMinutes: input.durationMinutes } : {}), // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+      ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
+      updatedAt: new Date()
+    };
+    const [updated] = await db.update(revisionZoomSessions).set(updateValues).where(eq(revisionZoomSessions.id, sessionId)).returning();
+
+    await db.insert(auditLogs).values({
+      actorUserId: admin.id,
+      action: "ADVANCE_REVISION_ZOOM_UPDATED",
+      entityType: "REVISION_ZOOM_SESSION",
+      entityId: sessionId,
+      metadata: { changed: Object.keys(input) }
+    });
+    response.json({ session: updated });
+  })
+);
+
+revisionRouter.delete(
+  "/admin/revision/zoom-sessions/:id",
+  asyncRoute(async (request, response) => {
+    const admin = await requireRole(request, ["admin"]);
+    const db = requireDatabase();
+    const sessionId = String(request.params.id);
+    const [existing] = await db.select().from(revisionZoomSessions).where(eq(revisionZoomSessions.id, sessionId)).limit(1);
+    if (!existing) throw new HttpError(404, "Zoom live class not found.");
+    await db.delete(revisionZoomSessions).where(eq(revisionZoomSessions.id, sessionId));
+    await db.insert(auditLogs).values({
+      actorUserId: admin.id,
+      action: "ADVANCE_REVISION_ZOOM_DELETED",
+      entityType: "REVISION_ZOOM_SESSION",
+      entityId: sessionId,
+      metadata: { courseId: existing.courseId, title: existing.title }
+    });
+    response.json({ success: true });
   })
 );

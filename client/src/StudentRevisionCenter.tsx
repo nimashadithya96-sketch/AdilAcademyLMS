@@ -79,6 +79,18 @@ type RevisionOverview = {
   advanced: RevisionLevelView | null;
 };
 
+// ADIL_ADVANCE_REVISION_ZOOM_V56
+type RevisionZoomSession = {
+  id: string;
+  title: string;
+  zoomUrl: string;
+  description: string | null;
+  scheduledAt: string | null;
+  durationMinutes: number; // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+  status: "UPCOMING" | "LIVE";
+  endsAt: string | null;
+};
+
 type RevisionDetail = {
   video: {
     id: string;
@@ -121,6 +133,19 @@ function levelName(level: "BASIC" | "ADVANCED") {
   return level === "BASIC" ? "Basic Revision" : "Advanced Revision";
 }
 
+function zoomScheduleLabel(value: string | null) {
+  if (!value) return "Live time will be shared by Admin";
+  try {
+    return new Intl.DateTimeFormat("en-LK", {
+      timeZone: "Asia/Colombo",
+      dateStyle: "full",
+      timeStyle: "short"
+    }).format(new Date(value));
+  } catch {
+    return "Live class";
+  }
+}
+
 export default function StudentRevisionCenter({
   VideoPlayer
 }: {
@@ -135,6 +160,9 @@ export default function StudentRevisionCenter({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [zoomSessions, setZoomSessions] = useState<RevisionZoomSession[]>([]); // ADIL_ADVANCE_REVISION_ZOOM_V56
+  const [zoomLoading, setZoomLoading] = useState(false);
+  const [zoomError, setZoomError] = useState("");
 
   const detailRef = useRef<RevisionDetail | null>(null);
   const queuedWatchSecondsRef = useRef(0);
@@ -166,6 +194,36 @@ export default function StudentRevisionCenter({
     const timer = window.setInterval(() => void loadOverview(true), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  async function loadZoomSessions() {
+    if (!overview?.advancedUnlocked) {
+      setZoomSessions([]);
+      return;
+    }
+    setZoomLoading(true);
+    try {
+      const response = await fetch("/api/student/revision/zoom-sessions");
+      const body = await response.json().catch(() => ({})) as { unlocked?: boolean; sessions?: RevisionZoomSession[]; message?: string };
+      if (!response.ok) throw new Error(body.message ?? "Zoom live classes could not be loaded.");
+      setZoomSessions(body.sessions ?? []);
+      setZoomError("");
+    } catch (reason) {
+      setZoomError(reason instanceof Error ? reason.message : "Zoom live classes could not be loaded.");
+    } finally {
+      setZoomLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!overview?.advancedUnlocked) {
+      setZoomSessions([]);
+      setZoomError("");
+      return;
+    }
+    void loadZoomSessions();
+    const timer = window.setInterval(() => void loadZoomSessions(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [overview?.advancedUnlocked, overview?.courseId]);
 
   const level = selectedLevel === "BASIC" ? overview?.basic : overview?.advanced;
 
@@ -359,6 +417,20 @@ export default function StudentRevisionCenter({
 
     {message && <div className="revision-limit-message"><Clock3 /><div><strong>{message.startsWith("Daily") ? "Daily Revision Limit Reached" : "Revision Access"}</strong><p>{message}</p></div></div>}
     {error && <p className="form-error">{error}</p>}
+
+    {selectedLevel === "ADVANCED" && overview.advancedUnlocked && <section className="revision-student-zoom"> {/* ADIL_ADVANCE_REVISION_ZOOM_V56 */}
+      <div className="revision-student-zoom-heading">
+        <div><span className="eyebrow">ADVANCED REVISION LIVE</span><h3>Zoom Live Classes</h3><p>Admin publish කරන live class link එකෙන් direct Zoom meeting එකට join වෙන්න.</p></div>
+        <span>{zoomSessions.some((session) => session.status === "LIVE") ? "LIVE NOW" : zoomSessions.length ? "UPCOMING" : "NO ACTIVE LINK"}</span>
+      </div>
+      {zoomError && <p className="form-error">{zoomError}</p>}
+      {zoomLoading && !zoomSessions.length ? <div className="revision-zoom-student-empty"><Clock3 /><strong>Checking Zoom live classes...</strong></div> : zoomSessions.length ? <div className="revision-student-zoom-list">
+        {zoomSessions.map((session) => <article className="revision-student-zoom-card" key={session.id}>
+          <div><span className={`revision-live-pill ${session.status.toLowerCase()}`}>{session.status === "LIVE" ? "LIVE NOW" : "UPCOMING"}</span><h4>{session.title}</h4><strong>{zoomScheduleLabel(session.scheduledAt)} • {session.durationMinutes || 120} min</strong>{session.description && <p>{session.description}</p>}</div>
+          <a className="button button-primary" href={session.zoomUrl} target="_blank" rel="noopener noreferrer">{session.status === "LIVE" ? "Join Zoom Live" : "Open Zoom Meeting"}</a>
+        </article>)}
+      </div> : <div className="revision-zoom-student-empty"><Clock3 /><strong>No Zoom live class is published right now.</strong><span>Admin publish කරන next live class link එක මෙතන automatically පෙන්වයි. End වුණු scheduled class links automatically hide වෙනවා.</span></div>}
+    </section>}
 
     <div className="revision-progress-strip">
       <div><span>{currentLevelName}</span><strong>{level?.completedVideos ?? 0}/{level?.totalVideos ?? 0} completed</strong></div>

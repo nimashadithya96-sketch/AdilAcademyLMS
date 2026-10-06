@@ -93,3 +93,18 @@ export async function sendFridayPayoutReminder(email: string, totalAmount: numbe
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:30px;background:#07110c;color:#fff;border-radius:16px"><p style="color:#7cff4f;font-weight:700;letter-spacing:2px">ADIL ACADEMY</p><h2>Friday payout reminder</h2><p>Consultant payments manually complete කිරීමට කාලයයි.</p><div style="margin:22px 0;padding:18px;border:1px solid #315c40;border-radius:12px"><strong>${consultantCount} consultants</strong><br><span style="font-size:28px;color:#7cff4f;font-weight:800">LKR ${totalAmount.toLocaleString()}</span></div><p>Admin Panel → Commissions වෙත ගොස් bank transfer එක සිදුකර, සාර්ථක වූ පසු <strong>Paid &amp; Clear Balance</strong> කරන්න.</p></div>`
   });
 }
+
+
+// ADIL_FORGOT_PASSWORD_V57
+export async function sendPasswordResetCode(email: string, name: string, code: string) {
+  const password = process.env.EMAIL_APP_PASSWORD?.replaceAll(" ", "");
+  if (!password) throw new Error("EMAIL_NOT_CONFIGURED");
+  const transporter = nodemailer.createTransport({ service: "gmail", auth: { user: senderEmail, pass: password } });
+  await transporter.sendMail({
+    from: `Adil Academy <${senderEmail}>`,
+    to: email,
+    subject: "Adil Academy password reset code",
+    text: `Hello ${name}, your Adil Academy password reset code is ${code}. It expires in 10 minutes. Do not share this code. If you did not request a password reset, ignore this email.`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:540px;margin:auto;padding:30px;background:#07110c;color:#fff;border-radius:16px"><p style="color:#7cff4f;font-weight:700;letter-spacing:2px">ADIL ACADEMY</p><h2>Password Reset</h2><p>ආයුබෝවන් ${name}, ඔබගේ Adil Academy password එක reset කිරීමට පහත code එක භාවිත කරන්න.</p><div style="font-size:34px;font-weight:800;letter-spacing:8px;margin:24px 0;color:#7cff4f">${code}</div><p style="color:#9aa59f">මෙම code එක විනාඩි 10කින් expire වේ. Code එක කිසිවෙකුට share කරන්න එපා.</p><p style="color:#9aa59f">ඔබ password reset එකක් request කළේ නැත්නම් මෙම email එක ignore කරන්න.</p></div>`
+  });
+}

@@ -1661,14 +1661,16 @@ const roleOptions: {
 
 function LoginPage({ onLogin }: { onLogin: (user: DemoUser) => void }) {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "register" | "verify">(
+  const [mode, setMode] = useState<"login" | "register" | "verify" | "forgot">(
     "login"
-  );
+  ); // ADIL_FORGOT_PASSWORD_V57
   const [busyRole, setBusyRole] = useState<UserRole | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [resetRequested, setResetRequested] = useState(false); // ADIL_FORGOT_PASSWORD_V57
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [proof, setProof] = useState<File | null>(null);
   const [courses, setCourses] = useState<{ id: string; title: string; price: string; currency: string }[]>([]);
   const [form, setForm] = useState({
@@ -1719,6 +1721,31 @@ function LoginPage({ onLogin }: { onLogin: (user: DemoUser) => void }) {
     setSubmitting(true);
     setError("");
     try {
+      if (mode === "forgot") { // ADIL_FORGOT_PASSWORD_V57
+        if (!resetRequested) {
+          const response = await fetch("/api/auth/forgot-password", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: form.email })
+          });
+          const data = await response.json() as { message?: string };
+          if (!response.ok) throw new Error(data.message || "Reset code request failed.");
+          setResetRequested(true);
+          setForm((current) => ({ ...current, otp: "", password: "" }));
+          setConfirmPassword("");
+          setShowPassword(false);
+          setNotice(data.message || "Reset code එක email කර ඇත.");
+          return;
+        }
+        if (form.password !== confirmPassword) throw new Error("Passwords දෙක සමාන විය යුතුයි.");
+        const response = await fetch("/api/auth/reset-password", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: form.email, code: form.otp, password: form.password })
+        });
+        const data = await response.json() as { user?: DemoUser; message?: string };
+        if (!response.ok || !data.user) throw new Error(data.message || "Password reset failed.");
+        onLogin(data.user);
+        navigate("/dashboard");
+        return;
+      }
       if (mode === "register") {
         if (!proof) throw new Error("Payment slip එක තෝරන්න.");
         const response = await fetch("/api/auth/apply", {
@@ -1815,6 +1842,8 @@ function LoginPage({ onLogin }: { onLogin: (user: DemoUser) => void }) {
                 className={mode === value ? "active" : ""}
                 onClick={() => {
                   setMode(value as typeof mode);
+                  setResetRequested(false); // ADIL_FORGOT_PASSWORD_V57
+                  setConfirmPassword("");
                   setForm((current) => ({ ...current, password: "", otp: "" }));
                   setShowPassword(false);
                   setError("");
@@ -1827,17 +1856,19 @@ function LoginPage({ onLogin }: { onLogin: (user: DemoUser) => void }) {
           </div>
           <>
               <span className="eyebrow">
-                {mode === "register" ? "STUDENT ADMISSION" : mode === "verify" ? "EMAIL VERIFICATION" : "WELCOME BACK"}
+                {mode === "register" ? "STUDENT ADMISSION" : mode === "verify" ? "EMAIL VERIFICATION" : mode === "forgot" ? "PASSWORD RECOVERY" : "WELCOME BACK"}
               </span>
               <h2>
-                {mode === "register" ? "Admission form එක" : mode === "verify" ? "OTP verify කරන්න" : "Login වෙන්න"}
+                {mode === "register" ? "Admission form එක" : mode === "verify" ? "OTP verify කරන්න" : mode === "forgot" ? (resetRequested ? "නව Password එක සකස් කරන්න" : "Password එක අමතකද?") : "Login වෙන්න"}
               </h2>
               <p>
                 {mode === "register"
                   ? "Details සහ payment proof submit කරන්න. Admin approval පසු OTP email එක ලැබේ."
                   : mode === "verify"
                     ? "Payment approve වූ පසු email එකට ලැබුණු OTP එක දමා permanent password එක සකස් කරන්න."
-                  : "ඔබගේ Adil Academy account එකට secure ලෙස ඇතුළු වෙන්න."}
+                    : mode === "forgot"
+                      ? (resetRequested ? "Email එකට ලැබුණු 6-digit reset code එක සහ නව password එක ඇතුළත් කරන්න." : "ඔබගේ account email එක දාන්න. Password reset code එක email එකට යවන්නම්.")
+                      : "ඔබගේ Adil Academy account එකට secure ලෙස ඇතුළු වෙන්න."}
               </p>
               <form className="auth-form" onSubmit={submitAccount}>
                 {mode === "register" && (
@@ -1892,10 +1923,11 @@ function LoginPage({ onLogin }: { onLogin: (user: DemoUser) => void }) {
                     }
                     placeholder="name@example.com"
                     autoComplete="email"
+                    readOnly={mode === "forgot" && resetRequested} // ADIL_FORGOT_PASSWORD_V57
                   />
                 </label>}
-                {mode === "verify" && <label className="auth-wide">OTP code<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={form.otp} onChange={(event) => setForm({ ...form, otp: event.target.value.replace(/\D/g, "") })} placeholder="6-digit OTP" /></label>}
-                {mode !== "register" && <label>
+                {(mode === "verify" || (mode === "forgot" && resetRequested)) && <label className="auth-wide">OTP code<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={form.otp} onChange={(event) => setForm({ ...form, otp: event.target.value.replace(/\D/g, "") })} placeholder={mode === "forgot" ? "6-digit reset code" : "6-digit OTP"} /></label>} {/* ADIL_FORGOT_PASSWORD_V57 */}
+                {(mode === "login" || mode === "verify" || (mode === "forgot" && resetRequested)) && <label>
                   Password
                   <span className="password-input-wrap">
                     <input
@@ -1905,21 +1937,25 @@ function LoginPage({ onLogin }: { onLogin: (user: DemoUser) => void }) {
                       value={form.password}
                       onChange={(event) => setForm({ ...form, password: event.target.value })}
                       placeholder="••••••••"
-                      autoComplete={mode === "verify" ? "new-password" : "current-password"}
-                      data-lpignore={mode === "verify" ? "true" : undefined}
-                      data-1p-ignore={mode === "verify" ? "true" : undefined}
+                      autoComplete={mode === "verify" || mode === "forgot" ? "new-password" : "current-password"}
+                      data-lpignore={mode === "verify" || mode === "forgot" ? "true" : undefined}
+                      data-1p-ignore={mode === "verify" || mode === "forgot" ? "true" : undefined}
                     />
                     <button type="button" className="password-visibility" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Password සඟවන්න" : "Password පෙන්වන්න"} title={showPassword ? "Password සඟවන්න" : "Password පෙන්වන්න"}>
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </span>
                 </label>}
-                {mode === "verify" && (
+                {mode === "login" && <button className="forgot-password-link" type="button" onClick={() => { setMode("forgot"); setResetRequested(false); setConfirmPassword(""); setForm((current) => ({ ...current, password: "", otp: "" })); setShowPassword(false); setError(""); setNotice(""); }}>Forgot password?</button>} {/* ADIL_FORGOT_PASSWORD_V57 */}
+                {mode === "forgot" && resetRequested && <label className="auth-wide">Confirm new password<input required minLength={8} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="••••••••" autoComplete="new-password" data-lpignore="true" data-1p-ignore="true" /></label>}
+                {(mode === "verify" || (mode === "forgot" && resetRequested)) && (
                   <small className="password-hint">
                     අකුරු 8+, uppercase, lowercase සහ number එකක් අවශ්‍යයි.
                   </small>
                 )}
                 {mode === "verify" && <button className="otp-resend" type="button" onClick={() => void resendOtp()}>OTP එක නැවත යවන්න</button>}
+                {mode === "forgot" && resetRequested && <button className="otp-resend" type="button" onClick={async () => { setError(""); try { const response = await fetch("/api/auth/forgot-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: form.email }) }); const data = await response.json() as { message?: string }; if (!response.ok) throw new Error(data.message || "Reset code resend failed."); setNotice(data.message || "Reset code එක නැවත email කර ඇත."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Reset code resend failed."); } }}>Reset code එක නැවත යවන්න</button>} {/* ADIL_FORGOT_PASSWORD_V57 */}
+                {mode === "forgot" && <button className="forgot-password-back" type="button" onClick={() => { setMode("login"); setResetRequested(false); setConfirmPassword(""); setForm((current) => ({ ...current, password: "", otp: "" })); setShowPassword(false); setError(""); setNotice(""); }}>← Login වෙත ආපසු</button>}
                 <button
                   type="submit"
                   className="button button-primary auth-submit"
@@ -1929,7 +1965,7 @@ function LoginPage({ onLogin }: { onLogin: (user: DemoUser) => void }) {
                     ? "Please wait..."
                     : mode === "register"
                       ? "Application submit කරන්න"
-                      : mode === "verify" ? "Verify කර Login වෙන්න" : "Login"}
+                      : mode === "verify" ? "Verify කර Login වෙන්න" : mode === "forgot" ? (resetRequested ? "Reset Password & Login" : "Send Reset Code") : "Login"}
                   {!submitting && <ArrowRight size={17} />}
                 </button>
               </form>

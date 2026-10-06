@@ -52,6 +52,28 @@ type VideoForm = {
   isPublished: boolean;
 };
 
+// ADIL_ADVANCE_REVISION_ZOOM_V56
+type RevisionZoomSession = {
+  id: string;
+  courseId: string;
+  title: string;
+  zoomUrl: string;
+  description: string | null;
+  scheduledAt: string | null;
+  durationMinutes: number; // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+type ZoomForm = {
+  title: string;
+  zoomUrl: string;
+  scheduledAt: string;
+  durationMinutes: string; // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+  description: string;
+  isPublished: boolean;
+};
+
 const emptyVideoForm: VideoForm = {
   title: "",
   videoProvider: "youtube",
@@ -60,6 +82,46 @@ const emptyVideoForm: VideoForm = {
   content: "",
   isPublished: false
 };
+
+const emptyZoomForm: ZoomForm = {
+  title: "",
+  zoomUrl: "",
+  scheduledAt: "",
+  durationMinutes: "120", // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+  description: "",
+  isPublished: false
+};
+
+function zoomDateTimeLocal(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function zoomDateTimeLabel(value: string | null) {
+  if (!value) return "Time not set";
+  try {
+    return new Intl.DateTimeFormat("en-LK", {
+      timeZone: "Asia/Colombo",
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(new Date(value));
+  } catch {
+    return "Time not set";
+  }
+}
+
+// ADIL_ADVANCE_REVISION_ZOOM_V56_1
+function zoomTimingStatus(session: Pick<RevisionZoomSession, "scheduledAt" | "durationMinutes">): "UPCOMING" | "LIVE" | "ENDED" {
+  if (!session.scheduledAt) return "LIVE";
+  const start = new Date(session.scheduledAt).getTime();
+  const end = start + Math.max(15, Number(session.durationMinutes || 120)) * 60_000;
+  const now = Date.now();
+  if (now < start) return "UPCOMING";
+  if (now <= end) return "LIVE";
+  return "ENDED";
+}
 
 async function readBody(response: Response) {
   const body = await response.json().catch(() => ({})) as { message?: string };
@@ -85,6 +147,11 @@ export default function RevisionAdminManager() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [zoomSessions, setZoomSessions] = useState<RevisionZoomSession[]>([]); // ADIL_ADVANCE_REVISION_ZOOM_V56
+  const [zoomForm, setZoomForm] = useState<ZoomForm>(emptyZoomForm);
+  const [zoomEditingId, setZoomEditingId] = useState<string | null>(null);
+  const [zoomSaving, setZoomSaving] = useState(false);
+  const [zoomLoading, setZoomLoading] = useState(false);
 
   const activeSeries = useMemo(
     () => data?.series.find((item) => item.level === activeLevel) ?? null,
@@ -133,12 +200,119 @@ export default function RevisionAdminManager() {
   }, []);
 
   useEffect(() => {
-    if (selectedCourseId) void loadRevision(selectedCourseId);
+    if (selectedCourseId) {
+      void loadRevision(selectedCourseId);
+      void loadZoomSessions(selectedCourseId);
+    }
   }, [selectedCourseId]);
+
+  async function loadZoomSessions(courseId = selectedCourseId) {
+    if (!courseId) {
+      setZoomSessions([]);
+      return;
+    }
+    setZoomLoading(true);
+    try {
+      const response = await fetch(`/api/admin/revision/zoom-sessions?courseId=${encodeURIComponent(courseId)}`);
+      const body = await response.json().catch(() => ({})) as { sessions?: RevisionZoomSession[]; message?: string };
+      if (!response.ok) throw new Error(body.message ?? "Zoom live classes could not be loaded.");
+      setZoomSessions(body.sessions ?? []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Zoom live classes could not be loaded.");
+    } finally {
+      setZoomLoading(false);
+    }
+  }
 
   function resetForm() {
     setForm(emptyVideoForm);
     setEditingId(null);
+  }
+
+  function resetZoomForm() {
+    setZoomForm(emptyZoomForm);
+    setZoomEditingId(null);
+  }
+
+  function beginZoomEdit(session: RevisionZoomSession) {
+    setZoomEditingId(session.id);
+    setZoomForm({
+      title: session.title,
+      zoomUrl: session.zoomUrl,
+      scheduledAt: zoomDateTimeLocal(session.scheduledAt),
+      durationMinutes: String(session.durationMinutes ?? 120), // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+      description: session.description ?? "",
+      isPublished: session.isPublished
+    });
+    setMessage("");
+    setError("");
+  }
+
+  async function saveZoomSession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCourseId) return;
+    setZoomSaving(true);
+    setMessage("");
+    setError("");
+    try {
+      const payload = {
+        ...(zoomEditingId ? {} : { courseId: selectedCourseId }),
+        title: zoomForm.title.trim(),
+        zoomUrl: zoomForm.zoomUrl.trim(),
+        scheduledAt: zoomForm.scheduledAt ? new Date(zoomForm.scheduledAt).toISOString() : null,
+        durationMinutes: Math.max(15, Math.min(1440, Number(zoomForm.durationMinutes || 120))), // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+        description: zoomForm.description.trim() || null,
+        isPublished: zoomForm.isPublished
+      };
+      const response = await fetch(
+        zoomEditingId ? `/api/admin/revision/zoom-sessions/${zoomEditingId}` : "/api/admin/revision/zoom-sessions",
+        {
+          method: zoomEditingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+      await readBody(response);
+      setMessage(zoomEditingId ? "Zoom live class updated." : "Zoom live class added to Advanced Revision.");
+      resetZoomForm();
+      await loadZoomSessions();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Zoom live class save failed.");
+    } finally {
+      setZoomSaving(false);
+    }
+  }
+
+  async function toggleZoomPublished(session: RevisionZoomSession) {
+    setMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/revision/zoom-sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublished: !session.isPublished })
+      });
+      await readBody(response);
+      setMessage(session.isPublished ? "Zoom live class moved to Draft." : "Zoom live class published to Advanced Revision students.");
+      await loadZoomSessions();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Zoom publish status update failed.");
+    }
+  }
+
+  async function deleteZoomSession(session: RevisionZoomSession) {
+    if (!window.confirm(`Delete this Zoom live class permanently?\n\n${session.title}`)) return;
+    setMessage("");
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/revision/zoom-sessions/${session.id}`, { method: "DELETE" });
+      await readBody(response);
+      if (zoomEditingId === session.id) resetZoomForm();
+      setMessage("Zoom live class deleted.");
+      await loadZoomSessions();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Zoom live class delete failed.");
+    }
   }
 
   function beginEdit(video: RevisionVideo) {
@@ -283,7 +457,7 @@ export default function RevisionAdminManager() {
     <div className="revision-course-picker">
       <label>
         <span>SELECT COURSE</span>
-        <select value={selectedCourseId} onChange={(event) => { setSelectedCourseId(event.target.value); resetForm(); }}>
+        <select value={selectedCourseId} onChange={(event) => { setSelectedCourseId(event.target.value); resetForm(); resetZoomForm(); }}>
           {courses.map((course) => <option value={course.id} key={course.id}>{course.title}{course.isPublished ? "" : " — Draft Course"}</option>)}
         </select>
       </label>
@@ -306,7 +480,7 @@ export default function RevisionAdminManager() {
             aria-selected={activeLevel === level}
             className={activeLevel === level ? "active" : ""}
             key={level}
-            onClick={() => { setActiveLevel(level); resetForm(); setMessage(""); setError(""); }}
+            onClick={() => { setActiveLevel(level); resetForm(); resetZoomForm(); setMessage(""); setError(""); }}
           >
             <span>{level === "BASIC" ? "Basic Revision" : "Advanced Revision"}</span>
             <small>{item?.publishedCount ?? 0}/{item?.videoCount ?? 0} published</small>
@@ -373,6 +547,44 @@ export default function RevisionAdminManager() {
           </article>)}
           {!activeSeries.videos.length && <div className="revision-empty-state"><LockKeyhole /><h3>No {activeLevel === "BASIC" ? "Basic" : "Advanced"} Revision videos yet</h3><p>You can build the system now and add recorded videos one by one later.</p></div>}
         </div>
+
+        {activeLevel === "ADVANCED" && <section className="revision-zoom-manager"> {/* ADIL_ADVANCE_REVISION_ZOOM_V56 */}
+          <div className="revision-zoom-heading">
+            <div><span className="eyebrow">ADVANCED REVISION LIVE</span><h3>Zoom Live Classes</h3><p>Advanced Revision studentsට direct Zoom meeting link publish කරන්න. Video progress සහ daily limits මේකෙන් වෙනස් වෙන්නේ නැහැ.</p></div>
+            <span className="revision-zoom-count">{zoomSessions.filter((item) => item.isPublished && zoomTimingStatus(item) !== "ENDED").length} ACTIVE LINK{zoomSessions.filter((item) => item.isPublished && zoomTimingStatus(item) !== "ENDED").length === 1 ? "" : "S"}</span>
+          </div>
+
+          <form className="revision-zoom-form" onSubmit={saveZoomSession}>
+            <label>Live class title<input value={zoomForm.title} onChange={(event) => setZoomForm({ ...zoomForm, title: event.target.value })} placeholder="Example: Advanced Market Review — Live" required minLength={2} /></label>
+            <label>Date & time (optional)<input type="datetime-local" value={zoomForm.scheduledAt} onChange={(event) => setZoomForm({ ...zoomForm, scheduledAt: event.target.value })} /></label>
+            <label>Duration (minutes)<input type="number" min="15" max="1440" step="5" value={zoomForm.durationMinutes} onChange={(event) => setZoomForm({ ...zoomForm, durationMinutes: event.target.value })} required /></label>
+            <label className="wide">Zoom meeting link<input type="url" value={zoomForm.zoomUrl} onChange={(event) => setZoomForm({ ...zoomForm, zoomUrl: event.target.value })} placeholder="https://us06web.zoom.us/j/..." required /></label>
+            <label className="wide">Student note<textarea value={zoomForm.description} onChange={(event) => setZoomForm({ ...zoomForm, description: event.target.value })} placeholder="Optional: class topic, preparation note, password instructions, etc." /></label>
+            <label className="revision-publish-check"><input type="checkbox" checked={zoomForm.isPublished} onChange={(event) => setZoomForm({ ...zoomForm, isPublished: event.target.checked })} /><span>Publish this Zoom link to Advanced Revision students</span></label>
+            <div className="revision-form-actions">
+              <button type="submit" className="button button-primary" disabled={zoomSaving}><Plus size={16} /> {zoomSaving ? "Saving..." : zoomEditingId ? "Save Zoom Changes" : "Add Zoom Live"}</button>
+              {zoomEditingId && <button type="button" className="button button-ghost" onClick={resetZoomForm}>Cancel Edit</button>}
+            </div>
+          </form>
+
+          <div className="revision-zoom-list">
+            {zoomLoading && <div className="workspace-note"><strong>Zoom live classes loading...</strong></div>}
+            {!zoomLoading && zoomSessions.map((session) => <article className={`revision-zoom-row ${session.isPublished ? "published" : "draft"}`} key={session.id}>
+              <div className="revision-zoom-main">
+                <div className="revision-video-title-row"><strong>{session.title}</strong><span className={`revision-zoom-status ${zoomTimingStatus(session).toLowerCase()}`}>{zoomTimingStatus(session)}</span><span className={session.isPublished ? "revision-badge published" : "revision-badge draft"}>{session.isPublished ? "PUBLISHED" : "DRAFT"}</span></div>
+                <span>{zoomDateTimeLabel(session.scheduledAt)} • {session.durationMinutes || 120} min</span>
+                <small>{session.description || "No student note"}</small>
+              </div>
+              <div className="revision-zoom-actions">
+                <a href={session.zoomUrl} target="_blank" rel="noreferrer">Open Link</a>
+                <button type="button" onClick={() => beginZoomEdit(session)}><Edit3 size={15} /> Edit</button>
+                <button type="button" onClick={() => void toggleZoomPublished(session)}>{session.isPublished ? "Draft" : "Publish"}</button>
+                <button type="button" className="danger" onClick={() => void deleteZoomSession(session)}><Trash2 size={15} /> Delete</button>
+              </div>
+            </article>)}
+            {!zoomLoading && !zoomSessions.length && <div className="revision-zoom-empty"><Video /><strong>No Zoom live classes added yet</strong><span>Add the next Zoom link here when you schedule an Advanced Revision live session.</span></div>}
+          </div>
+        </section>}
       </>}
     </>}
   </section>;

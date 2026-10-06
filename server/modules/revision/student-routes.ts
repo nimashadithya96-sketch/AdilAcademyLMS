@@ -8,7 +8,8 @@ import {
   revisionStudentAccess,
   revisionStudentLevelState,
   revisionVideoProgress,
-  revisionVideos
+  revisionVideos,
+  revisionZoomSessions
 } from "../../../db/schema";
 import { HttpError, requireAuthenticatedUser } from "../../lib/auth";
 import { asyncRoute } from "../../lib/http";
@@ -355,5 +356,55 @@ revisionStudentRouter.post(
       .where(eq(revisionStudentAccess.id, advanced.access.id))
       .returning();
     response.json({ access: saved });
+  })
+);
+
+
+// ADIL_ADVANCE_REVISION_ZOOM_V56: published Zoom links are protected by Advanced Revision access.
+revisionStudentRouter.get(
+  "/student/revision/zoom-sessions",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const db = requireDatabase();
+    const unlock = await ensureRevisionEligibilityState(db, user.id);
+    if (!unlock.enrollment || !unlock.access?.revisionUnlockedAt) {
+      response.json({ unlocked: false, sessions: [] });
+      return;
+    }
+    const advanced = await maybeUnlockAdvancedRevision(db, user.id, unlock.enrollment.courseId);
+    if (!advanced.access?.advancedUnlockedAt) {
+      response.json({ unlocked: false, sessions: [] });
+      return;
+    }
+    const sessions = await db
+      .select({
+        id: revisionZoomSessions.id,
+        title: revisionZoomSessions.title,
+        zoomUrl: revisionZoomSessions.zoomUrl,
+        description: revisionZoomSessions.description,
+        scheduledAt: revisionZoomSessions.scheduledAt,
+        durationMinutes: revisionZoomSessions.durationMinutes // ADIL_ADVANCE_REVISION_ZOOM_V56_1
+      })
+      .from(revisionZoomSessions)
+      .where(and(
+        eq(revisionZoomSessions.courseId, unlock.enrollment.courseId),
+        eq(revisionZoomSessions.isPublished, true)
+      ))
+      .orderBy(asc(revisionZoomSessions.scheduledAt), asc(revisionZoomSessions.createdAt));
+    const now = Date.now();
+    const activeSessions = sessions.flatMap((session) => {
+      const startMs = session.scheduledAt ? new Date(session.scheduledAt).getTime() : null;
+      const durationMinutes = Math.max(15, Number(session.durationMinutes || 120));
+      const endMs = startMs === null ? null : startMs + durationMinutes * 60_000;
+      if (endMs !== null && now > endMs) return []; // ADIL_ADVANCE_REVISION_ZOOM_V56_1: ended links are not exposed to students.
+      const status = startMs === null || now >= startMs ? "LIVE" : "UPCOMING";
+      return [{
+        ...session,
+        durationMinutes,
+        status,
+        endsAt: endMs === null ? null : new Date(endMs).toISOString()
+      }];
+    });
+    response.json({ unlocked: true, sessions: activeSessions });
   })
 );

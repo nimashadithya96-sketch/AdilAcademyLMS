@@ -41,6 +41,7 @@ import { startFridayCommissionScheduler } from "./modules/commissions/scheduler"
 import { platformRouter } from "./modules/platform/routes";
 import { supportRouter } from "./modules/support/routes";
 import { ccoMainRouter } from "./modules/cco-main/routes";
+import { passwordResetRouter } from "./modules/password-reset/routes"; // ADIL_FORGOT_PASSWORD_V57
 import { ccoSetupGuideRouter } from "./modules/cco-setup-guide/routes"; // ADIL_CCO_SETUP_GUIDE_V53
 import { studentTrainingRouter } from "./modules/student-training/routes"; // ADIL_STUDENT_TRAINING_V55
 
@@ -585,6 +586,7 @@ app.use("/api", halfPaymentAdminRouter);
 app.use("/api", platformRouter);
 app.use("/api", supportRouter);
 app.use("/api", ccoMainRouter);
+app.use("/api", passwordResetRouter); // ADIL_FORGOT_PASSWORD_V57
 app.use("/api", ccoSetupGuideRouter); // ADIL_CCO_SETUP_GUIDE_V53
 app.use("/api", studentTrainingRouter); // ADIL_STUDENT_TRAINING_V55
 app.use("/api", adminAdmissionHeroesRouter);

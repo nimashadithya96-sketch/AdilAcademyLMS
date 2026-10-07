@@ -11,7 +11,8 @@ import {
   revisionStudentAccess,
   revisionStudentLevelState,
   revisionVideoProgress,
-  revisionVideos
+  revisionVideos,
+  videoAccessOverrides
 } from "../../../db/schema";
 
 export const REVISION_PASS_PERCENT = 75;
@@ -181,6 +182,65 @@ export async function evaluateMainCourseRevisionEligibility(
   };
 }
 
+// ADIL_ADMIN_UNLOCK_REVISION_V59
+async function hasAdminAllVideoUnlock(db: Db, userId: string, courseId: string) {
+  const [override] = await db
+    .select({ unlockAllVideos: videoAccessOverrides.unlockAllVideos })
+    .from(videoAccessOverrides)
+    .where(
+      and(
+        eq(videoAccessOverrides.userId, userId),
+        eq(videoAccessOverrides.courseId, courseId)
+      )
+    )
+    .limit(1);
+  return override?.unlockAllVideos === true;
+}
+
+export async function grantBasicRevisionAccessFromAdminUnlock(
+  db: Db,
+  userId: string,
+  courseId: string
+) {
+  const [existing] = await db
+    .select()
+    .from(revisionStudentAccess)
+    .where(
+      and(
+        eq(revisionStudentAccess.userId, userId),
+        eq(revisionStudentAccess.courseId, courseId)
+      )
+    )
+    .limit(1);
+  if (existing?.revisionUnlockedAt) return { access: existing, newlyUnlocked: false };
+
+  const now = new Date();
+  const inserted = await db
+    .insert(revisionStudentAccess)
+    .values({
+      userId,
+      courseId,
+      revisionUnlockedAt: now,
+      updatedAt: now
+    })
+    .onConflictDoNothing()
+    .returning();
+
+  if (inserted.length) return { access: inserted[0], newlyUnlocked: true };
+
+  const [access] = await db
+    .select()
+    .from(revisionStudentAccess)
+    .where(
+      and(
+        eq(revisionStudentAccess.userId, userId),
+        eq(revisionStudentAccess.courseId, courseId)
+      )
+    )
+    .limit(1);
+  return { access: access ?? null, newlyUnlocked: false };
+}
+
 export async function ensureRevisionEligibilityState(db: Db, userId: string) {
   const enrollment = await getPrimaryStudentEnrollment(db, userId);
   const eligibility = await evaluateMainCourseRevisionEligibility(db, userId, enrollment);
@@ -200,32 +260,13 @@ export async function ensureRevisionEligibilityState(db: Db, userId: string) {
     .limit(1);
 
   let newlyUnlocked = false;
-  if (!access && eligibility.eligible) {
-    const now = new Date();
-    const inserted = await db
-      .insert(revisionStudentAccess)
-      .values({
-        userId,
-        courseId: enrollment.courseId,
-        revisionUnlockedAt: now,
-        updatedAt: now
-      })
-      .onConflictDoNothing()
-      .returning();
-    newlyUnlocked = inserted.length > 0;
-    [access] = inserted.length
-      ? inserted
-      : await db
-          .select()
-          .from(revisionStudentAccess)
-          .where(
-            and(
-              eq(revisionStudentAccess.userId, userId),
-              eq(revisionStudentAccess.courseId, enrollment.courseId)
-            )
-          )
-          .limit(1);
+  const adminAllVideosUnlocked = await hasAdminAllVideoUnlock(db, userId, enrollment.courseId); // ADIL_ADMIN_UNLOCK_REVISION_V59
+  if (!access && (eligibility.eligible || adminAllVideosUnlocked)) {
+    const granted = await grantBasicRevisionAccessFromAdminUnlock(db, userId, enrollment.courseId);
+    access = granted.access ?? undefined;
+    newlyUnlocked = granted.newlyUnlocked;
   }
+  // ADIL_ADMIN_UNLOCK_REVISION_V59_ELIGIBILITY
 
   return {
     enrollment,

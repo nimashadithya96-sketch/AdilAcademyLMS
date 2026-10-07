@@ -26,7 +26,24 @@ const updateVideoSchema = z.object({
 
 const moveSchema = z.object({ direction: z.enum(["UP", "DOWN"]) });
 
+// Public catalog: published video metadata is visible, but provider / video ID are never exposed.
 studentTrainingRouter.get("/public/student-training/videos", asyncRoute(async (_request, response) => {
+  const db = requireDatabase();
+  const videos = await db.select({
+    id: studentTrainingVideos.id,
+    title: studentTrainingVideos.title,
+    description: studentTrainingVideos.description,
+    position: studentTrainingVideos.position
+  }).from(studentTrainingVideos)
+    .where(eq(studentTrainingVideos.isPublished, true))
+    .orderBy(asc(studentTrainingVideos.position), asc(studentTrainingVideos.createdAt));
+  response.json({ videos });
+}));
+
+// Registered account access: published video playback data is available only after authentication.
+// A consultant is also an already-registered Adil Academy account, so consultant accounts keep access.
+studentTrainingRouter.get("/student/student-training/videos", asyncRoute(async (request, response) => {
+  await requireRole(request, ["student", "consultant"]);
   const db = requireDatabase();
   const videos = await db.select({
     id: studentTrainingVideos.id,
@@ -38,7 +55,7 @@ studentTrainingRouter.get("/public/student-training/videos", asyncRoute(async (_
   }).from(studentTrainingVideos)
     .where(eq(studentTrainingVideos.isPublished, true))
     .orderBy(asc(studentTrainingVideos.position), asc(studentTrainingVideos.createdAt));
-  response.json({ videos });
+  response.json({ videos, unlocked: true });
 }));
 
 studentTrainingRouter.get("/admin/student-training/videos", asyncRoute(async (request, response) => {

@@ -22,7 +22,7 @@ import {
 import { HttpError, requireAuthenticatedUser, requireRole } from "../../lib/auth";
 import { asyncRoute } from "../../lib/http";
 import { deletePrivateFile, downloadPrivateFile, uploadPrivateFile } from "../../services/storage";
-import { ensureRevisionEligibilityState } from "../revision/student-service"; // ADIL_STUDENT_REVISION_V46
+import { ensureRevisionEligibilityState, grantBasicRevisionAccessFromAdminUnlock } from "../revision/student-service"; // ADIL_STUDENT_REVISION_V46 // ADIL_ADMIN_UNLOCK_REVISION_V59
 
 export const courseRouter = Router();
 
@@ -1080,6 +1080,11 @@ courseRouter.post(
         }
       });
 
+    if (input.unlocked) {
+      await grantBasicRevisionAccessFromAdminUnlock(db, input.userId, input.courseId);
+    }
+    // ADIL_ADMIN_UNLOCK_REVISION_V59_ADMIN_ROUTE
+
     await db.insert(auditLogs).values({
       actorUserId: admin.id,
       action: input.unlocked ? "ALL_VIDEOS_UNLOCKED" : "VIDEO_LIMITS_RESTORED",
@@ -1092,7 +1097,7 @@ courseRouter.post(
       success: true,
       unlocked: input.unlocked,
       message: input.unlocked
-        ? "මෙම studentට සියලු videos unlock කළා."
+        ? "මෙම studentට සියලු videos සහ Basic Revision access unlock කළා."
         : "මෙම studentට normal Daily 3 + Q & A unlock rules නැවත enable කළා."
     });
   })

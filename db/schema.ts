@@ -1082,6 +1082,7 @@ export const studentTrainingVideos = pgTable("student_training_videos", {
   videoProvider: text("video_provider").default("youtube").notNull(),
   videoId: text("video_id").notNull(),
   position: integer("position").notNull(),
+  accessType: text("access_type").default("FREE").notNull(), // ADIL_STUDENT_TRAINING_ACCESS_V58
   isPublished: boolean("is_published").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()

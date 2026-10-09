@@ -1,6 +1,8 @@
-import { useEffect, useState, type ComponentType, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from "react";
 import CcoTrainingVideosWorkspace from "./CcoTrainingVideosWorkspace";
 import "./student-training-videos.css";
+
+type AccessType = "FREE" | "PAID";
 
 type AdminVideo = {
   id: string;
@@ -9,6 +11,7 @@ type AdminVideo = {
   videoProvider: string;
   videoId: string;
   position: number;
+  accessType: AccessType;
   isPublished: boolean;
   createdAt: string;
   updatedAt: string;
@@ -21,13 +24,16 @@ type VideoPlayerProps = {
   watermark?: string;
 };
 
-const emptyForm = {
-  title: "",
-  description: "",
-  videoProvider: "youtube" as "youtube" | "vimeo",
-  videoId: "",
-  isPublished: false
-};
+function makeEmptyForm(accessType: AccessType) {
+  return {
+    title: "",
+    description: "",
+    videoProvider: "youtube" as "youtube" | "vimeo",
+    videoId: "",
+    accessType,
+    isPublished: false
+  };
+}
 
 function StudentTrainingVideosManager({
   VideoPlayer
@@ -35,7 +41,8 @@ function StudentTrainingVideosManager({
   VideoPlayer: ComponentType<VideoPlayerProps>;
 }) {
   const [videos, setVideos] = useState<AdminVideo[]>([]);
-  const [form, setForm] = useState({ ...emptyForm });
+  const [category, setCategory] = useState<AccessType>("FREE");
+  const [form, setForm] = useState(makeEmptyForm("FREE"));
   const [editingId, setEditingId] = useState("");
   const [previewId, setPreviewId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -49,25 +56,38 @@ function StudentTrainingVideosManager({
       message?: string;
     };
     if (!response.ok) throw new Error(data.message ?? "Student training videos load failed.");
-    setVideos(data.videos ?? []);
+    setVideos((data.videos ?? []).map((video) => ({ ...video, accessType: video.accessType ?? "FREE" })));
   }
 
   useEffect(() => {
     load().catch((error: Error) => setMessage(error.message)).finally(() => setLoading(false));
   }, []);
 
-  function resetForm() {
+  const visibleVideos = useMemo(
+    () => videos.filter((video) => video.accessType === category),
+    [videos, category]
+  );
+
+  function switchCategory(next: AccessType) {
+    setCategory(next);
+    setPreviewId("");
+    if (!editingId) setForm(makeEmptyForm(next));
+  }
+
+  function resetForm(nextCategory: AccessType = category) {
     setEditingId("");
-    setForm({ ...emptyForm });
+    setForm(makeEmptyForm(nextCategory));
   }
 
   function edit(video: AdminVideo) {
+    setCategory(video.accessType);
     setEditingId(video.id);
     setForm({
       title: video.title,
       description: video.description ?? "",
       videoProvider: video.videoProvider === "vimeo" ? "vimeo" : "youtube",
       videoId: video.videoId,
+      accessType: video.accessType,
       isPublished: video.isPublished
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -88,14 +108,17 @@ function StudentTrainingVideosManager({
             description: form.description.trim() || null,
             videoProvider: form.videoProvider,
             videoId: form.videoId.trim(),
+            accessType: form.accessType,
             isPublished: form.isPublished
           })
         }
       );
       const data = await response.json().catch(() => ({})) as { message?: string };
       if (!response.ok) throw new Error(data.message ?? "Student training video save failed.");
-      setMessage(editingId ? "Student training video updated." : "Student training video added.");
-      resetForm();
+      setMessage(editingId ? "Student training video updated." : `${form.accessType} Student Training video added.`);
+      const savedCategory = form.accessType;
+      setCategory(savedCategory);
+      resetForm(savedCategory);
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Student training video save failed.");
@@ -144,7 +167,7 @@ function StudentTrainingVideosManager({
   }
 
   async function remove(video: AdminVideo) {
-    if (!window.confirm(`Delete Student Training video: ${video.title}?`)) return;
+    if (!window.confirm(`Delete ${video.accessType} Student Training video: ${video.title}?`)) return;
     setWorking(true);
     setMessage("");
     try {
@@ -153,7 +176,7 @@ function StudentTrainingVideosManager({
         const data = await response.json().catch(() => ({})) as { message?: string };
         throw new Error(data.message ?? "Video delete failed.");
       }
-      if (editingId === video.id) resetForm();
+      if (editingId === video.id) resetForm(video.accessType);
       if (previewId === video.id) setPreviewId("");
       setMessage("Student training video deleted.");
       await load();
@@ -166,17 +189,42 @@ function StudentTrainingVideosManager({
 
   const preview = videos.find((video) => video.id === previewId) ?? null;
   const errorMessage = /failed|not found|error/i.test(message);
+  const freeCount = videos.filter((video) => video.accessType === "FREE").length;
+  const paidCount = videos.filter((video) => video.accessType === "PAID").length;
 
   return (
     <div className="student-training-admin">
+      <section className="dash-card workspace-card student-training-access-manager">
+        <div className="workspace-heading">
+          <div>
+            <span className="eyebrow">STUDENT TRAINING ACCESS</span>
+            <h2>Free / Paid Training Videos</h2>
+            <p>
+              FREE = public page එකෙන් account එකක් නැතිවම play කළ හැක. PAID = public page එකේ locked ලෙස පෙනෙන අතර
+              active course account එකකින් login වූ පසු unlock වේ.
+            </p>
+          </div>
+        </div>
+
+        <div className="student-training-access-tabs" role="tablist" aria-label="Free and paid student training videos">
+          <button type="button" className={category === "FREE" ? "active free" : ""} onClick={() => switchCategory("FREE")}>
+            FREE Videos <span>{freeCount}</span>
+          </button>
+          <button type="button" className={category === "PAID" ? "active paid" : ""} onClick={() => switchCategory("PAID")}>
+            PAID Videos <span>{paidCount}</span>
+          </button>
+        </div>
+      </section>
+
       <section className="dash-card workspace-card">
         <div className="workspace-heading">
           <div>
-            <span className="eyebrow">STUDENT GETTING STARTED</span>
-            <h2>Student Training Videos</h2>
+            <span className="eyebrow">{category} STUDENT TRAINING</span>
+            <h2>{editingId ? "Edit Training Video" : `Add ${category} Training Video`}</h2>
             <p>
-              Studentsට registration, payment, account activation සහ course access ගැන
-              step-by-step videos add කරන්න.
+              {category === "FREE"
+                ? "මෙහි publish කරන videos public Student Getting Started page එකෙන් direct play කළ හැක."
+                : "මෙහි publish කරන videos public page එකේ locked ලෙස පෙන්වයි; active student account එකකින් login වුණාම play කළ හැක."}
             </p>
           </div>
         </div>
@@ -189,22 +237,45 @@ function StudentTrainingVideosManager({
             <input
               value={form.title}
               onChange={(event) => setForm({ ...form, title: event.target.value })}
-              placeholder="e.g. How to Register for Your Course"
+              placeholder="e.g. How to Buy Your Course"
               required
             />
+          </label>
+
+          <label>
+            Access type
+            <select
+              value={form.accessType}
+              onChange={(event) => {
+                const accessType = event.target.value as AccessType;
+                setForm({ ...form, accessType });
+                setCategory(accessType);
+              }}
+            >
+              <option value="FREE">FREE — Public can watch</option>
+              <option value="PAID">PAID — Student account unlock</option>
+            </select>
           </label>
 
           <label>
             Video provider
             <select
               value={form.videoProvider}
-              onChange={(event) => setForm({
-                ...form,
-                videoProvider: event.target.value as "youtube" | "vimeo"
-              })}
+              onChange={(event) => setForm({ ...form, videoProvider: event.target.value as "youtube" | "vimeo" })}
             >
               <option value="youtube">YouTube</option>
               <option value="vimeo">Vimeo</option>
+            </select>
+          </label>
+
+          <label>
+            Publish status
+            <select
+              value={form.isPublished ? "PUBLISHED" : "DRAFT"}
+              onChange={(event) => setForm({ ...form, isPublished: event.target.value === "PUBLISHED" })}
+            >
+              <option value="DRAFT">Draft</option>
+              <option value="PUBLISHED">Published</option>
             </select>
           </label>
 
@@ -223,25 +294,16 @@ function StudentTrainingVideosManager({
             <textarea
               value={form.description}
               onChange={(event) => setForm({ ...form, description: event.target.value })}
-              placeholder="මෙම step එකෙන් studentට කරන්න ඕන දේ..."
+              placeholder="මෙම training video එකේ studentට කියලා දෙන දේ..."
             />
-          </label>
-
-          <label className="student-training-publish">
-            <input
-              type="checkbox"
-              checked={form.isPublished}
-              onChange={(event) => setForm({ ...form, isPublished: event.target.checked })}
-            />
-            Publish immediately
           </label>
 
           <div className="student-training-form-actions">
             <button className="button button-primary" disabled={working}>
-              {working ? "Saving..." : editingId ? "Save Changes" : "+ Add New Video"}
+              {working ? "Saving..." : editingId ? "Save Changes" : `+ Add ${category} Video`}
             </button>
             {editingId && (
-              <button type="button" className="button button-ghost" onClick={resetForm}>
+              <button type="button" className="button button-ghost" onClick={() => resetForm(category)}>
                 Cancel Edit
               </button>
             )}
@@ -252,29 +314,34 @@ function StudentTrainingVideosManager({
       <section className="dash-card workspace-card">
         <div className="workspace-heading">
           <div>
-            <span className="eyebrow">STEP ORDER</span>
-            <h2>Student Getting Started Video List</h2>
-            <p>Published videos විතරක් public Student Getting Started Guide එකේ පෙන්වයි.</p>
+            <span className="eyebrow">{category} VIDEO LIST</span>
+            <h2>{category === "FREE" ? "Public Free Training Videos" : "Student Account Paid Training Videos"}</h2>
+            <p>
+              {category === "FREE"
+                ? "Published FREE videos public page එකෙන් play වෙයි."
+                : "Published PAID videos public page එකේ locked ලෙස පෙනේ; enrolled student login එකෙන් unlock වෙයි."}
+            </p>
           </div>
-          <span className="student-training-count">{videos.length} Videos</span>
+          <span className="student-training-count">{visibleVideos.length} Videos</span>
         </div>
 
         {loading && <p>Loading Student Training videos...</p>}
-        {!loading && !videos.length && (
+        {!loading && !visibleVideos.length && (
           <div className="workspace-note">
-            <strong>Student videos තවම add කර නැහැ.</strong>
-            <p>ඉහළ form එකෙන් පළමු Getting Started video එක add කරන්න.</p>
+            <strong>{category} videos තවම add කර නැහැ.</strong>
+            <p>ඉහළ form එකෙන් පළමු {category} Training video එක add කරන්න.</p>
           </div>
         )}
 
         <div className="student-training-list">
-          {videos.map((video, index) => (
+          {visibleVideos.map((video, index) => (
             <article key={video.id}>
               <span className="student-training-admin-step">{String(index + 1).padStart(2, "0")}</span>
 
               <div className="student-training-item-copy">
                 <div>
                   <strong>{video.title}</strong>
+                  <span className={`student-training-access-badge ${video.accessType.toLowerCase()}`}>{video.accessType}</span>
                   <span className={video.isPublished ? "status-badge success" : "status-badge"}>
                     {video.isPublished ? "Published" : "Draft"}
                   </span>
@@ -285,7 +352,7 @@ function StudentTrainingVideosManager({
 
               <div className="student-training-actions">
                 <button type="button" disabled={working || index === 0} onClick={() => void move(video, "UP")}>↑</button>
-                <button type="button" disabled={working || index === videos.length - 1} onClick={() => void move(video, "DOWN")}>↓</button>
+                <button type="button" disabled={working || index === visibleVideos.length - 1} onClick={() => void move(video, "DOWN")}>↓</button>
                 <button type="button" onClick={() => setPreviewId(previewId === video.id ? "" : video.id)}>
                   {previewId === video.id ? "Close Preview" : "Preview"}
                 </button>
@@ -302,7 +369,7 @@ function StudentTrainingVideosManager({
         {preview && (
           <div className="student-training-preview">
             <div>
-              <span className="eyebrow">ADMIN PREVIEW</span>
+              <span className={`student-training-access-badge ${preview.accessType.toLowerCase()}`}>{preview.accessType} ADMIN PREVIEW</span>
               <h3>{preview.title}</h3>
             </div>
             <VideoPlayer
@@ -310,7 +377,7 @@ function StudentTrainingVideosManager({
               provider={preview.videoProvider}
               rawValue={preview.videoId}
               title={preview.title}
-              watermark="ADIL ACADEMY • STUDENT TRAINING PREVIEW"
+              watermark={`ADIL ACADEMY • ${preview.accessType} TRAINING PREVIEW`}
             />
           </div>
         )}
@@ -332,21 +399,13 @@ export default function TrainingVideosWorkspace({
         <div>
           <span className="eyebrow">ADIL ACADEMY TRAINING CENTER</span>
           <h2>Training Videos</h2>
-          <p>Student onboarding videos සහ CCO setup videos එකම තැනකින් වෙන වෙනම manage කරන්න.</p>
+          <p>Student FREE/PAID training videos සහ CCO setup videos එකම තැනකින් වෙන වෙනම manage කරන්න.</p>
         </div>
         <div className="training-videos-tabs" role="tablist" aria-label="Training video groups">
-          <button
-            type="button"
-            className={tab === "STUDENT" ? "active" : ""}
-            onClick={() => setTab("STUDENT")}
-          >
+          <button type="button" className={tab === "STUDENT" ? "active" : ""} onClick={() => setTab("STUDENT")}>
             Student Training
           </button>
-          <button
-            type="button"
-            className={tab === "CCO" ? "active" : ""}
-            onClick={() => setTab("CCO")}
-          >
+          <button type="button" className={tab === "CCO" ? "active" : ""} onClick={() => setTab("CCO")}>
             CCO Training
           </button>
         </div>

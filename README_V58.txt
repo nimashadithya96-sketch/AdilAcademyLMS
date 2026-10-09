@@ -1,25 +1,37 @@
-ADIL ACADEMY — Student Training Registration Unlock v58
-UPDATE ONLY
+ADIL ACADEMY — Student Training FREE / PAID v58 — UPDATE ONLY
 
-WHAT CHANGES
-- Published Student Training video titles/descriptions remain visible on the public Getting Started page.
-- Before registration/login, every published video is shown as LOCKED.
-- Video provider / YouTube or Vimeo ID is NOT returned by the public API.
-- After a registered Student account logs in, all currently published Student Training videos unlock automatically.
-- Existing Consultant accounts are also treated as already-registered Academy accounts and retain access.
-- Draft/unpublished Student Training videos remain hidden from the public list and from registered playback.
-- Admin Publish / Unpublish / Edit / Delete / Reorder remains unchanged.
-- CCO Training is not changed.
-- Course payment, course activation, normal course progress, Revision, Zoom, consultant network and commissions are not changed.
+WHAT THIS CHANGES
+1. Admin -> Training Videos -> Student Training now has separate FREE Videos and PAID Videos sections.
+2. FREE published videos are playable publicly from the existing Student Getting Started page.
+3. PAID published videos are visible publicly as LOCKED cards, but their video ID/link is NOT returned by the public API.
+4. After a student/consultant logs in with an ACTIVE course enrollment, PAID videos automatically unlock on the same Training Videos page.
+5. Existing Student Training videos are classified as FREE by default, so the current "How to buy/register" onboarding videos remain publicly watchable.
+6. Draft videos remain hidden from public/student published lists.
+7. FREE and PAID videos have independent ordering.
 
-IMPORTANT ACCESS RULE
-Registration unlock means an existing registered account must be authenticated (logged in). Payment/full-course activation is NOT required for Student Training video playback.
+NOT CHANGED
+- Normal course videos/progress
+- Basic/Advance Revision rules
+- Advance Revision Zoom Live
+- Forgot Password
+- Payments/Pay IDs
+- Consultant/CCO logic
+- CCO Training Videos
+- Commissions
 
-DATABASE
-No database migration is required.
+SECURITY
+- Public endpoint never returns the video_id of a PAID video.
+- PAID video links are returned only after authenticated student/consultant access AND an ACTIVE course enrollment exists.
 
 INSTALL
-Upload this ZIP to the Replit workspace, unzip it and run:
-  ./INSTALL_STUDENT_TRAINING_REGISTER_LOCK_V58.sh
+Upload this ZIP to the Replit project root, unzip, then run:
+  ./INSTALL_STUDENT_TRAINING_FREE_PAID_V58.sh
 
-The installer creates a timestamped backup and runs npm run check + npm run build.
+After preview testing, apply Production DB migration explicitly:
+  ./APPLY_PRODUCTION_DB_V58.sh
+
+Migration 0030 adds only:
+  student_training_videos.access_type text NOT NULL DEFAULT 'FREE'
+
+Backups are created under:
+  backup/student-training-free-paid-v58/

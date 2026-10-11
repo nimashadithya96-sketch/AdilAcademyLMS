@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import argon2 from "argon2";
-import express, { Router } from "express";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import express, { Router, type Request } from "express";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm"; // ADIL_CCO_PAYID_REUSE_V59
 import { z } from "zod";
 import { requireDatabase } from "../../../db/client";
 import { accountNumberSequence, auditLogs, ccoMainApplications, ccoMainPayIds, networkAccounts, notifications, users } from "../../../db/schema";
@@ -36,6 +36,18 @@ function makePayId() {
   return `CCO-${day}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
+// ADIL_CCO_PAYID_REUSE_V59: bind a CCO Pay ID to the first public IP that uses it.
+// The raw IP is never stored; only a SHA-256 hash is persisted.
+function payIdClientIpHash(request: Request) {
+  const forwarded = request.headers["x-forwarded-for"];
+  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const realIp = request.headers["x-real-ip"];
+  const raw = String(forwardedValue || realIp || request.socket.remoteAddress || request.ip || "unknown")
+    .split(",")[0]
+    .trim();
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
 ccoMainRouter.post("/admin/cco-main/pay-ids", asyncRoute(async (request, response) => {
   const admin = await requireRole(request, ["admin"]);
   const input = issueSchema.parse(request.body);
@@ -58,9 +70,19 @@ ccoMainRouter.post("/admin/cco-main/pay-ids", asyncRoute(async (request, respons
 ccoMainRouter.post("/public/cco-main/validate", asyncRoute(async (request, response) => {
   const code = z.string().trim().min(8).parse(request.body?.payId).toUpperCase();
   const db = requireDatabase();
-  const [payId] = await db.select().from(ccoMainPayIds).where(and(eq(ccoMainPayIds.code, code), isNull(ccoMainPayIds.claimedAt), isNull(ccoMainPayIds.cancelledAt), gt(ccoMainPayIds.expiresAt, new Date()))).limit(1);
-  if (!payId) throw new HttpError(400, "Pay ID එක invalid, expired හෝ කලින් භාවිත කර ඇත.");
-  response.json({ valid: true, name: payId.intendedName, email: payId.intendedEmail, phone: payId.intendedPhone, amount: Number(payId.amount) });
+  const ipHash = payIdClientIpHash(request);
+  // ADIL_CCO_PAYID_REUSE_V59: reusable for 48h, but only from the first-bound public IP.
+  const [payId] = await db.update(ccoMainPayIds).set({
+    boundIpHash: ipHash,
+    claimedAt: sql`COALESCE(${ccoMainPayIds.claimedAt}, now())`
+  }).where(and(
+    eq(ccoMainPayIds.code, code),
+    isNull(ccoMainPayIds.cancelledAt),
+    gt(ccoMainPayIds.expiresAt, new Date()),
+    or(isNull(ccoMainPayIds.boundIpHash), eq(ccoMainPayIds.boundIpHash, ipHash))
+  )).returning();
+  if (!payId) throw new HttpError(400, "Pay ID එක invalid/expired හෝ වෙනත් device/IP එකකට bind වී ඇත.");
+  response.json({ valid: true, name: payId.intendedName, email: payId.intendedEmail, phone: payId.intendedPhone, amount: Number(payId.amount), expiresAt: payId.expiresAt });
 }));
 
 ccoMainRouter.post("/public/cco-main/applications", asyncRoute(async (request, response) => {
@@ -70,12 +92,36 @@ ccoMainRouter.post("/public/cco-main/applications", asyncRoute(async (request, r
   const email = input.email.toLowerCase();
   const registrationToken = crypto.randomBytes(32).toString("base64url");
   const result = await db.transaction(async (tx) => {
-    const [payId] = await tx.update(ccoMainPayIds).set({ claimedAt: new Date() }).where(and(
-      eq(ccoMainPayIds.code, code), eq(ccoMainPayIds.intendedEmail, email), isNull(ccoMainPayIds.claimedAt),
-      isNull(ccoMainPayIds.cancelledAt), gt(ccoMainPayIds.expiresAt, new Date())
+    const ipHash = payIdClientIpHash(request);
+    const [payId] = await tx.update(ccoMainPayIds).set({
+      boundIpHash: ipHash,
+      claimedAt: sql`COALESCE(${ccoMainPayIds.claimedAt}, now())`
+    }).where(and(
+      eq(ccoMainPayIds.code, code), eq(ccoMainPayIds.intendedEmail, email),
+      isNull(ccoMainPayIds.cancelledAt), gt(ccoMainPayIds.expiresAt, new Date()),
+      or(isNull(ccoMainPayIds.boundIpHash), eq(ccoMainPayIds.boundIpHash, ipHash))
     )).returning();
-    if (!payId) throw new HttpError(409, "Pay ID එක invalid, expired, වෙනත් email එකකට අදාළ හෝ භාවිත කර ඇත.");
+    if (!payId) throw new HttpError(409, "Pay ID එක invalid/expired, වෙනත් email එකකට අදාළ, හෝ වෙනත් device/IP එකකට bind වී ඇත.");
     if (input.transactionReference.toUpperCase() !== code) throw new HttpError(400, "Bank reference එක special Pay ID එකට සමාන විය යුතුයි.");
+
+    // ADIL_CCO_PAYID_REUSE_V59: if the first attempt created the application but proof upload failed,
+    // issue a fresh upload token instead of consuming/rejecting the same Pay ID.
+    const [retry] = await tx.select({ application: ccoMainApplications, account: networkAccounts })
+      .from(ccoMainApplications)
+      .innerJoin(networkAccounts, eq(networkAccounts.id, ccoMainApplications.accountId))
+      .where(eq(ccoMainApplications.payIdId, payId.id))
+      .limit(1);
+    if (retry) {
+      if (retry.application.status !== "AWAITING_PROOF") {
+        throw new HttpError(409, "මෙම Pay ID එකෙන් application එක දැනටමත් submit කර ඇත. Admin review status එක බලන්න.");
+      }
+      await tx.update(ccoMainApplications).set({
+        registrationTokenHash: tokenHash(registrationToken),
+        updatedAt: new Date()
+      }).where(eq(ccoMainApplications.id, retry.application.id));
+      return { application: retry.application, account: retry.account, reused: true };
+    }
+
     const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
     if (existing) throw new HttpError(409, "මෙම email එකට දැනටමත් account එකක් තිබේ.");
     const [user] = await tx.insert(users).values({
@@ -104,7 +150,7 @@ ccoMainRouter.post("/public/cco-main/applications", asyncRoute(async (request, r
     }).returning();
     return { application, account };
   });
-  response.json({ applicationId: result.application.id, registrationToken, accountNumber: `CN${result.account.numericPart}` });
+  response.json({ applicationId: result.application.id, registrationToken, accountNumber: `CN${result.account.numericPart}`, reused: "reused" in result ? result.reused : false }); // ADIL_CCO_PAYID_REUSE_V59
 }));
 
 ccoMainRouter.put("/public/cco-main/applications/:id/proof", express.raw({ type: ["image/jpeg", "image/png", "image/webp", "application/pdf"], limit: "8mb" }), asyncRoute(async (request, response) => {

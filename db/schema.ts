@@ -433,6 +433,7 @@ export const ccoMainPayIds = pgTable("cco_main_pay_ids", {
   amount: numeric("amount", { precision: 12, scale: 2 }).default("5000").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  boundIpHash: text("bound_ip_hash"), // ADIL_CCO_PAYID_REUSE_V59
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   createdBy: uuid("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()

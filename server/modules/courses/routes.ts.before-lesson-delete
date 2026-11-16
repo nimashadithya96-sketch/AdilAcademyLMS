@@ -1,0 +1,860 @@
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import crypto from "node:crypto";
+import express, { Router } from "express";
+import { z } from "zod";
+import { requireDatabase } from "../../../db/client";
+import {
+  courseSections,
+  courses,
+  enrollments,
+  lessonProgress,
+  lessons,
+  networkAccounts,
+  paymentRequests,
+  quizAttempts,
+  quizQuestions,
+  quizzes
+} from "../../../db/schema";
+import { HttpError, requireAuthenticatedUser, requireRole } from "../../lib/auth";
+import { asyncRoute } from "../../lib/http";
+import { deletePrivateFile, downloadPrivateFile, uploadPrivateFile } from "../../services/storage";
+
+export const courseRouter = Router();
+
+const courseInput = z.object({
+  slug: z.string().trim().min(3).max(120).regex(/^[a-z0-9-]+$/),
+  title: z.string().trim().min(3).max(180),
+  shortDescription: z.string().trim().min(10).max(400),
+  description: z.string().trim().max(10000).optional(),
+  price: z.coerce.number().positive(),
+  points: z.coerce.number().int().min(0).default(0),
+  halfPaymentLessonLimit: z.coerce.number().int().min(0).max(10000).default(7),
+  currency: z.string().trim().length(3).default("LKR"),
+  isPublished: z.boolean().default(false)
+});
+
+async function courseAccess(db: ReturnType<typeof requireDatabase>, userId: string, courseId: string) {
+  const [payment] = await db.select({ status: paymentRequests.status })
+    .from(paymentRequests)
+    .where(and(eq(paymentRequests.userId, userId), eq(paymentRequests.courseId, courseId), inArray(paymentRequests.status, ["PARTIAL", "APPROVED"])))
+    .orderBy(desc(paymentRequests.createdAt)).limit(1);
+  const [course] = await db.select({ halfPaymentLessonLimit: courses.halfPaymentLessonLimit }).from(courses).where(eq(courses.id, courseId)).limit(1);
+  return { accessLevel: payment?.status === "APPROVED" ? "FULL" as const : "HALF" as const, halfPaymentLessonLimit: course?.halfPaymentLessonLimit ?? 0 };
+}
+
+const sectionInput = z.object({
+  courseId: z.string().uuid(),
+  title: z.string().trim().min(2).max(180),
+  position: z.coerce.number().int().min(1)
+});
+
+const lessonInput = z.object({
+  sectionId: z.string().uuid(),
+  title: z.string().trim().min(2).max(180),
+  content: z.string().trim().max(30000).optional(),
+  videoProvider: z.enum(["youtube", "vimeo"]).optional(),
+  videoId: z.string().trim().max(200).optional(),
+  durationSeconds: z.coerce.number().int().min(0).default(0),
+  position: z.coerce.number().int().min(1),
+  isPreview: z.boolean().default(false)
+});
+
+const progressInput = z.object({
+  enrollmentId: z.string().uuid(),
+  lessonId: z.string().uuid(),
+  elapsedSeconds: z.coerce.number().int().min(1).max(15),
+  durationSeconds: z.coerce.number().int().min(10).max(86400)
+});
+const quizInput = z.object({
+  courseId: z.string().uuid(),
+  title: z.string().trim().min(3).max(180),
+  passingPercent: z.coerce.number().int().min(1).max(100).default(70),
+  position: z.coerce.number().int().min(1),
+  isPublished: z.boolean().default(false)
+});
+const questionInput = z.object({
+  quizId: z.string().uuid(),
+  question: z.string().trim().min(3).max(2000),
+  options: z.array(z.string().trim().min(1).max(1000)).min(2).max(8),
+  correctOption: z.coerce.number().int().min(0),
+  explanation: z.string().trim().max(3000).optional(),
+  position: z.coerce.number().int().min(1)
+});
+const attemptInput = z.object({
+  answers: z.array(z.coerce.number().int().min(0)).max(200)
+});
+const courseUpdateInput = courseInput.partial().refine((value) => Object.keys(value).length > 0);
+const sectionUpdateInput = sectionInput.omit({ courseId: true }).partial().refine((value) => Object.keys(value).length > 0);
+const lessonUpdateInput = lessonInput.omit({ sectionId: true }).partial().refine((value) => Object.keys(value).length > 0);
+
+courseRouter.get(
+  "/courses",
+  asyncRoute(async (_request, response) => {
+    const db = requireDatabase();
+    const items = await db
+      .select({
+        id: courses.id,
+        slug: courses.slug,
+        title: courses.title,
+        shortDescription: courses.shortDescription,
+        price: courses.price,
+        currency: courses.currency,
+        language: courses.language,
+        thumbnailUrl: courses.thumbnailUrl
+        ,halfPaymentLessonLimit: courses.halfPaymentLessonLimit
+      })
+      .from(courses)
+      .where(eq(courses.isPublished, true))
+      .orderBy(asc(courses.createdAt));
+    response.json({ courses: items });
+  })
+);
+
+courseRouter.get(
+  "/courses/:slug",
+  asyncRoute(async (request, response) => {
+    const db = requireDatabase();
+    const [course] = await db
+      .select()
+      .from(courses)
+      .where(
+        and(
+          eq(courses.slug, String(request.params.slug)),
+          eq(courses.isPublished, true)
+        )
+      )
+      .limit(1);
+    if (!course) {
+      response.status(404).json({ message: "Course not found." });
+      return;
+    }
+
+    const sections = await db
+      .select()
+      .from(courseSections)
+      .where(eq(courseSections.courseId, course.id))
+      .orderBy(asc(courseSections.position));
+    const sectionIds = new Set(sections.map((section) => section.id));
+    const allLessons = sectionIds.size
+      ? await db
+          .select({
+            id: lessons.id,
+            sectionId: lessons.sectionId,
+            title: lessons.title,
+            durationSeconds: lessons.durationSeconds,
+            position: lessons.position,
+            isPreview: lessons.isPreview
+          })
+          .from(lessons)
+          .where(inArray(lessons.sectionId, [...sectionIds]))
+          .orderBy(asc(lessons.position))
+      : [];
+
+    const [{ enrolledStudents }] = await db.select({ enrolledStudents: count() })
+      .from(enrollments)
+      .where(and(eq(enrollments.courseId, course.id), eq(enrollments.status, "ACTIVE")));
+    response.json({
+      course,
+      enrolledStudents,
+      sections: sections.map((section) => ({
+        ...section,
+        lessons: allLessons.filter(
+          (lesson) => lesson.sectionId === section.id
+        )
+      }))
+    });
+  })
+);
+
+courseRouter.get(
+  "/courses/:id/thumbnail",
+  asyncRoute(async (request, response) => {
+    const db = requireDatabase();
+    const [course] = await db.select({ key: courses.thumbnailUrl }).from(courses)
+      .where(eq(courses.id, String(request.params.id))).limit(1);
+    if (!course?.key) { response.status(404).json({ message: "Course image not found." }); return; }
+    const extension = course.key.split(".").pop()?.toLowerCase();
+    response.type(extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg")
+      .set("Cache-Control", "public, max-age=3600")
+      .send(await downloadPrivateFile(course.key));
+  })
+);
+
+courseRouter.get(
+  "/student/enrollments",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const db = requireDatabase();
+    const items = await db
+      .select({
+        enrollmentId: enrollments.id,
+        status: enrollments.status,
+        enrolledAt: enrollments.enrolledAt,
+        completedAt: enrollments.completedAt,
+        courseId: courses.id,
+        slug: courses.slug,
+        title: courses.title,
+        shortDescription: courses.shortDescription,
+        thumbnailUrl: courses.thumbnailUrl
+      })
+      .from(enrollments)
+      .innerJoin(courses, eq(enrollments.courseId, courses.id))
+      .where(eq(enrollments.userId, user.id))
+      .orderBy(asc(enrollments.enrolledAt));
+    response.json({ enrollments: await Promise.all(items.map(async (item) => ({ ...item, ...(await courseAccess(db, user.id, item.courseId)) }))) });
+  })
+);
+
+courseRouter.get(
+  "/student/dashboard-summary",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const db = requireDatabase();
+    const [account] = await db.select().from(networkAccounts).where(
+      and(
+        eq(networkAccounts.ownerUserId, user.id),
+        eq(networkAccounts.isMainAccount, true)
+      )
+    ).limit(1);
+    const [enrollment] = await db.select({
+      id: enrollments.id,
+      status: enrollments.status,
+      courseId: enrollments.courseId,
+      courseTitle: courses.title,
+      halfPaymentLessonLimit: courses.halfPaymentLessonLimit
+    }).from(enrollments)
+      .innerJoin(courses, eq(enrollments.courseId, courses.id))
+      .where(eq(enrollments.userId, user.id))
+      .orderBy(asc(enrollments.enrolledAt)).limit(1);
+
+    if (!enrollment) {
+      response.json({
+        enrollmentStatus: "NOT_ENROLLED",
+        enrollmentId: null,
+        courseTitle: null,
+        totalLessons: 0,
+        completedLessons: 0,
+        progressPercent: 0,
+        quizAverage: null,
+        accountNumber: account ? `${account.prefix}${account.numericPart}` : null,
+        accountStatus: account?.status ?? null,
+        modules: [],
+        recentActivity: []
+      });
+      return;
+    }
+
+    const access = await courseAccess(db, user.id, enrollment.courseId);
+    const sections = await db.select({ id: courseSections.id, title: courseSections.title, position: courseSections.position })
+      .from(courseSections).where(eq(courseSections.courseId, enrollment.courseId)).orderBy(asc(courseSections.position));
+    const sectionIds = sections.map((item) => item.id);
+    const unorderedLessons = sectionIds.length
+      ? await db.select({ id: lessons.id, title: lessons.title, sectionId: lessons.sectionId, position: lessons.position }).from(lessons)
+          .where(inArray(lessons.sectionId, sectionIds)).orderBy(asc(lessons.position))
+      : [];
+    const sectionOrder = new Map(sections.map((section, index) => [section.id, index]));
+    const courseLessons = [...unorderedLessons].sort((a, b) =>
+      (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0) || a.position - b.position
+    );
+    const lessonOrder = new Map(courseLessons.map((lesson, index) => [lesson.id, index]));
+    const learningAccessActive = enrollment.status === "ACTIVE" || enrollment.status === "COMPLETED";
+    const unlockedLimit = learningAccessActive
+      ? access.accessLevel === "FULL" ? courseLessons.length : access.halfPaymentLessonLimit
+      : 0;
+    const progress = await db.select().from(lessonProgress)
+      .where(eq(lessonProgress.enrollmentId, enrollment.id))
+      .orderBy(asc(lessonProgress.updatedAt));
+    const completed = progress.filter((item) => item.progressPercent === 100);
+    const progressByLesson = new Map(progress.map((item) => [item.lessonId, item.progressPercent]));
+    const attempts = await db.select({ score: quizAttempts.scorePercent })
+      .from(quizAttempts).innerJoin(quizzes, eq(quizAttempts.quizId, quizzes.id))
+      .where(and(eq(quizAttempts.userId, user.id), eq(quizzes.courseId, enrollment.courseId)));
+    const quizAverage = attempts.length
+      ? Math.round(attempts.reduce((sum, item) => sum + item.score, 0) / attempts.length)
+      : null;
+    const lessonTitles = new Map(courseLessons.map((item) => [item.id, item.title]));
+    const completedIds = new Set(completed.map((item) => item.lessonId));
+    const modules = sections.map((section) => {
+      const moduleLessons = courseLessons.filter((lesson) => lesson.sectionId === section.id);
+      const moduleCompleted = moduleLessons.filter((lesson) => completedIds.has(lesson.id)).length;
+      return {
+        title: section.title,
+        totalLessons: moduleLessons.length,
+        completedLessons: moduleCompleted,
+        progressPercent: moduleLessons.length
+          ? Math.round((moduleCompleted / moduleLessons.length) * 100)
+          : 0,
+        lessons: moduleLessons.map((lesson) => ({
+          id: lesson.id,
+          title: lesson.title,
+          locked: (lessonOrder.get(lesson.id) ?? 0) >= unlockedLimit,
+          progressPercent: progressByLesson.get(lesson.id) ?? 0
+        }))
+      };
+    });
+    const recentActivity = [...progress].reverse().slice(0, 3).map((item) => ({
+      title: lessonTitles.get(item.lessonId) ?? "Course lesson",
+      detail: item.progressPercent === 100 ? "Completed" : `${item.progressPercent}% watched`
+    }));
+
+    response.json({
+      enrollmentStatus: enrollment.status,
+      enrollmentId: enrollment.id,
+      courseTitle: enrollment.courseTitle,
+      totalLessons: courseLessons.length,
+      completedLessons: completed.length,
+      progressPercent: courseLessons.length
+        ? Math.round((completed.length / courseLessons.length) * 100)
+        : 0,
+      quizAverage,
+      accountNumber: account ? `${account.prefix}${account.numericPart}` : null,
+      accountStatus: account?.status ?? null,
+      accessLevel: access.accessLevel,
+      halfPaymentLessonLimit: access.halfPaymentLessonLimit,
+      unlockedLessons: unlockedLimit,
+      modules,
+      recentActivity
+    });
+  })
+);
+
+courseRouter.get(
+  "/student/lessons/:id",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const db = requireDatabase();
+    const lessonId = String(request.params.id);
+    const [record] = await db
+      .select({
+        enrollmentId: enrollments.id,
+        enrollmentStatus: enrollments.status,
+        courseId: courses.id,
+        courseTitle: courses.title,
+        moduleId: courseSections.id,
+        moduleTitle: courseSections.title,
+        lessonId: lessons.id,
+        lessonTitle: lessons.title,
+        videoProvider: lessons.videoProvider,
+        videoId: lessons.videoId,
+        content: lessons.content,
+        durationSeconds: lessons.durationSeconds
+      })
+      .from(lessons)
+      .innerJoin(courseSections, eq(lessons.sectionId, courseSections.id))
+      .innerJoin(courses, eq(courseSections.courseId, courses.id))
+      .innerJoin(
+        enrollments,
+        and(eq(enrollments.courseId, courses.id), eq(enrollments.userId, user.id))
+      )
+      .where(
+        and(
+          eq(lessons.id, lessonId),
+          inArray(enrollments.status, ["ACTIVE", "COMPLETED"])
+        )
+      )
+      .limit(1);
+
+    if (!record) throw new HttpError(404, "Active course lesson එක හමු නොවුණා.");
+
+    const access = await courseAccess(db, user.id, record.courseId);
+    const sections = await db
+      .select({ id: courseSections.id, position: courseSections.position })
+      .from(courseSections)
+      .where(eq(courseSections.courseId, record.courseId))
+      .orderBy(asc(courseSections.position));
+    const sectionOrder = new Map(sections.map((section, index) => [section.id, index]));
+    const orderedLessons = sections.length
+      ? await db
+          .select({ id: lessons.id, sectionId: lessons.sectionId, position: lessons.position })
+          .from(lessons)
+          .where(inArray(lessons.sectionId, sections.map((section) => section.id)))
+          .orderBy(asc(lessons.position))
+      : [];
+    orderedLessons.sort((a, b) =>
+      (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0) ||
+      a.position - b.position
+    );
+    const lessonIndex = orderedLessons.findIndex((item) => item.id === record.lessonId);
+    if (lessonIndex < 0) throw new HttpError(404, "Lesson එක course එක තුළ හමු නොවුණා.");
+    if (access.accessLevel === "HALF" && lessonIndex >= access.halfPaymentLessonLimit) {
+      throw new HttpError(403, "Balance payment approval is required to unlock this lesson.");
+    }
+
+    const [progress] = await db
+      .select({
+        progressPercent: lessonProgress.progressPercent,
+        watchedSeconds: lessonProgress.watchedSeconds,
+        detectedDurationSeconds: lessonProgress.detectedDurationSeconds
+      })
+      .from(lessonProgress)
+      .where(
+        and(
+          eq(lessonProgress.enrollmentId, record.enrollmentId),
+          eq(lessonProgress.lessonId, record.lessonId)
+        )
+      )
+      .limit(1);
+
+    response.json({
+      enrollmentId: record.enrollmentId,
+      accessLevel: access.accessLevel,
+      lesson: {
+        id: record.lessonId,
+        title: record.lessonTitle,
+        moduleTitle: record.moduleTitle,
+        courseTitle: record.courseTitle,
+        videoProvider: record.videoProvider,
+        videoId: record.videoId,
+        content: record.content,
+        durationSeconds: record.durationSeconds || progress?.detectedDurationSeconds || 0,
+        watchedSeconds: progress?.watchedSeconds ?? 0,
+        progressPercent: progress?.progressPercent ?? 0
+      }
+    });
+  })
+);
+
+courseRouter.post(
+  "/student/progress",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const input = progressInput.parse(request.body);
+    const db = requireDatabase();
+
+    const [enrollment] = await db
+      .select()
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.id, input.enrollmentId),
+          eq(enrollments.userId, user.id),
+          inArray(enrollments.status, ["ACTIVE", "COMPLETED"])
+        )
+      )
+      .limit(1);
+    if (!enrollment) {
+      response.status(403).json({ message: "Active enrollment required." });
+      return;
+    }
+
+    const [lesson] = await db
+      .select({
+        id: lessons.id,
+        courseId: courseSections.courseId,
+        durationSeconds: lessons.durationSeconds
+      })
+      .from(lessons)
+      .innerJoin(courseSections, eq(lessons.sectionId, courseSections.id))
+      .where(eq(lessons.id, input.lessonId))
+      .limit(1);
+    if (!lesson || lesson.courseId !== enrollment.courseId) {
+      response.status(400).json({ message: "Lesson is not in this course." });
+      return;
+    }
+
+    const access = await courseAccess(db, user.id, enrollment.courseId);
+    if (access.accessLevel === "HALF") {
+      const sections = await db
+        .select({ id: courseSections.id })
+        .from(courseSections)
+        .where(eq(courseSections.courseId, enrollment.courseId))
+        .orderBy(asc(courseSections.position));
+      const sectionOrder = new Map(sections.map((section, index) => [section.id, index]));
+      const unorderedLessons = sections.length
+        ? await db
+            .select({ id: lessons.id, sectionId: lessons.sectionId, position: lessons.position })
+            .from(lessons)
+            .where(inArray(lessons.sectionId, sections.map((section) => section.id)))
+            .orderBy(asc(lessons.position))
+        : [];
+      const orderedLessons = [...unorderedLessons].sort((a, b) =>
+        (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0) ||
+        a.position - b.position
+      );
+      const lessonIndex = orderedLessons.findIndex((item) => item.id === input.lessonId);
+      if (lessonIndex < 0 || lessonIndex >= access.halfPaymentLessonLimit) {
+        throw new HttpError(403, "Balance payment approval is required to unlock this lesson.");
+      }
+    }
+
+    let effectiveDurationSeconds = lesson.durationSeconds > 0
+      ? lesson.durationSeconds
+      : input.durationSeconds;
+
+    if (lesson.durationSeconds <= 0) {
+      const [updatedLesson] = await db
+        .update(lessons)
+        .set({ durationSeconds: input.durationSeconds })
+        .where(eq(lessons.id, lesson.id))
+        .returning({ durationSeconds: lessons.durationSeconds });
+      effectiveDurationSeconds = updatedLesson?.durationSeconds ?? input.durationSeconds;
+    }
+
+    const [current] = await db
+      .select()
+      .from(lessonProgress)
+      .where(
+        and(
+          eq(lessonProgress.enrollmentId, input.enrollmentId),
+          eq(lessonProgress.lessonId, input.lessonId)
+        )
+      )
+      .limit(1);
+
+    const now = new Date();
+    const elapsedWallSeconds = current?.lastHeartbeatAt
+      ? Math.max(0, Math.floor((now.getTime() - current.lastHeartbeatAt.getTime()) / 1000))
+      : input.elapsedSeconds;
+    const acceptedSeconds = current?.progressPercent === 100
+      ? 0
+      : Math.min(input.elapsedSeconds, Math.max(0, elapsedWallSeconds + 2));
+    const restoredWatchedSeconds = current
+      ? Math.max(
+          current.watchedSeconds,
+          Math.floor((current.progressPercent / 100) * effectiveDurationSeconds)
+        )
+      : 0;
+    const watchedSeconds = Math.min(
+      effectiveDurationSeconds,
+      restoredWatchedSeconds + acceptedSeconds
+    );
+    const completed = current?.progressPercent === 100 ||
+      watchedSeconds >= Math.max(1, effectiveDurationSeconds - 2);
+    const progressPercent = completed
+      ? 100
+      : Math.max(
+          current?.progressPercent ?? 0,
+          Math.min(99, Math.floor((watchedSeconds / effectiveDurationSeconds) * 100))
+        );
+    const completedAt = completed
+      ? current?.completedAt ?? now
+      : null;
+
+    const [saved] = await db
+      .insert(lessonProgress)
+      .values({
+        enrollmentId: input.enrollmentId,
+        lessonId: input.lessonId,
+        progressPercent,
+        watchedSeconds,
+        detectedDurationSeconds: effectiveDurationSeconds,
+        lastHeartbeatAt: now,
+        completedAt,
+        updatedAt: now
+      })
+      .onConflictDoUpdate({
+        target: [lessonProgress.enrollmentId, lessonProgress.lessonId],
+        set: {
+          progressPercent,
+          watchedSeconds,
+          detectedDurationSeconds: effectiveDurationSeconds,
+          lastHeartbeatAt: now,
+          completedAt,
+          updatedAt: now
+        }
+      })
+      .returning();
+
+    response.json({
+      progress: saved,
+      acceptedSeconds,
+      durationSeconds: effectiveDurationSeconds
+    });
+  })
+);
+
+courseRouter.get(
+  "/student/quizzes/:id",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const db = requireDatabase();
+    const [quiz] = await db
+      .select()
+      .from(quizzes)
+      .where(
+        and(
+          eq(quizzes.id, String(request.params.id)),
+          eq(quizzes.isPublished, true)
+        )
+      )
+      .limit(1);
+    if (!quiz) {
+      response.status(404).json({ message: "Quiz not found." });
+      return;
+    }
+    const [enrollment] = await db
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.userId, user.id),
+          eq(enrollments.courseId, quiz.courseId),
+          eq(enrollments.status, "ACTIVE")
+        )
+      )
+      .limit(1);
+    if (!enrollment) {
+      response.status(403).json({ message: "Active enrollment required." });
+      return;
+    }
+    const questions = await db
+      .select({
+        id: quizQuestions.id,
+        question: quizQuestions.question,
+        options: quizQuestions.options,
+        position: quizQuestions.position
+      })
+      .from(quizQuestions)
+      .where(eq(quizQuestions.quizId, quiz.id))
+      .orderBy(asc(quizQuestions.position));
+    response.json({ quiz, questions });
+  })
+);
+
+courseRouter.post(
+  "/student/quizzes/:id/attempts",
+  asyncRoute(async (request, response) => {
+    const user = await requireAuthenticatedUser(request);
+    const input = attemptInput.parse(request.body);
+    const db = requireDatabase();
+    const [quiz] = await db
+      .select()
+      .from(quizzes)
+      .where(
+        and(
+          eq(quizzes.id, String(request.params.id)),
+          eq(quizzes.isPublished, true)
+        )
+      )
+      .limit(1);
+    if (!quiz) {
+      response.status(404).json({ message: "Quiz not found." });
+      return;
+    }
+    const [enrollment] = await db
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.userId, user.id),
+          eq(enrollments.courseId, quiz.courseId),
+          eq(enrollments.status, "ACTIVE")
+        )
+      )
+      .limit(1);
+    if (!enrollment) {
+      response.status(403).json({ message: "Active enrollment required." });
+      return;
+    }
+    const questions = await db
+      .select()
+      .from(quizQuestions)
+      .where(eq(quizQuestions.quizId, quiz.id))
+      .orderBy(asc(quizQuestions.position));
+    if (questions.length === 0 || input.answers.length !== questions.length) {
+      response.status(400).json({ message: "Answer every quiz question." });
+      return;
+    }
+    const correct = questions.reduce(
+      (total, question, index) =>
+        total + (input.answers[index] === question.correctOption ? 1 : 0),
+      0
+    );
+    const scorePercent = Math.round((correct / questions.length) * 100);
+    const passed = scorePercent >= quiz.passingPercent;
+    const [attempt] = await db
+      .insert(quizAttempts)
+      .values({
+        quizId: quiz.id,
+        userId: user.id,
+        answers: input.answers,
+        scorePercent,
+        passed
+      })
+      .returning();
+    response.status(201).json({
+      attempt,
+      explanations: questions.map((question) => ({
+        questionId: question.id,
+        correctOption: question.correctOption,
+        explanation: question.explanation
+      }))
+    });
+  })
+);
+
+courseRouter.post(
+  "/admin/quizzes",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const input = quizInput.parse(request.body);
+    const db = requireDatabase();
+    const [created] = await db.insert(quizzes).values(input).returning();
+    response.status(201).json({ quiz: created });
+  })
+);
+
+courseRouter.post(
+  "/admin/quiz-questions",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const input = questionInput.parse(request.body);
+    if (input.correctOption >= input.options.length) {
+      response.status(400).json({ message: "Correct option is out of range." });
+      return;
+    }
+    const db = requireDatabase();
+    const [created] = await db
+      .insert(quizQuestions)
+      .values(input)
+      .returning();
+    response.status(201).json({ question: created });
+  })
+);
+
+courseRouter.post(
+  "/admin/courses",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const input = courseInput.parse(request.body);
+    const db = requireDatabase();
+    const [created] = await db
+      .insert(courses)
+      .values({
+        ...input,
+        price: input.price.toFixed(2)
+      })
+      .returning();
+    response.status(201).json({ course: created });
+  })
+);
+
+courseRouter.get(
+  "/admin/courses",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const db = requireDatabase();
+    const courseItems = await db.select().from(courses).orderBy(asc(courses.createdAt));
+    const result = await Promise.all(courseItems.map(async (course) => {
+      const sections = await db.select().from(courseSections)
+        .where(eq(courseSections.courseId, course.id)).orderBy(asc(courseSections.position));
+      const sectionIds = sections.map((section) => section.id);
+      const lessonItems = sectionIds.length ? await db.select().from(lessons)
+        .where(inArray(lessons.sectionId, sectionIds)).orderBy(asc(lessons.position)) : [];
+      return { ...course, sections: sections.map((section) => ({
+        ...section,
+        lessons: lessonItems.filter((lesson) => lesson.sectionId === section.id)
+      })) };
+    }));
+    response.json({ courses: result });
+  })
+);
+
+courseRouter.patch(
+  "/admin/courses/:id",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin"]);
+    const input = courseUpdateInput.parse(request.body);
+    const db = requireDatabase();
+    const { price, ...courseChanges } = input;
+    const [course] = await db.update(courses).set({
+      ...courseChanges,
+      ...(price !== undefined ? { price: price.toFixed(2) } : {}),
+      updatedAt: new Date()
+    }).where(eq(courses.id, String(request.params.id))).returning();
+    if (!course) { response.status(404).json({ message: "Course not found." }); return; }
+    response.json({ course });
+  })
+);
+
+courseRouter.put(
+  "/admin/courses/:id/thumbnail",
+  express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: "5mb" }),
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin"]);
+    if (!Buffer.isBuffer(request.body) || request.body.length < 10) {
+      response.status(400).json({ message: "Course cover image එකක් තෝරන්න." }); return;
+    }
+    const db = requireDatabase();
+    const [existing] = await db.select({ id: courses.id, previousKey: courses.thumbnailUrl }).from(courses)
+      .where(eq(courses.id, String(request.params.id))).limit(1);
+    if (!existing) { response.status(404).json({ message: "Course not found." }); return; }
+    const mime = request.headers["content-type"] ?? "image/jpeg";
+    const extension = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
+    const key = `course-thumbnails/${existing.id}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
+    await uploadPrivateFile(key, request.body);
+    await db.update(courses).set({ thumbnailUrl: key, updatedAt: new Date() }).where(eq(courses.id, existing.id));
+    if (existing.previousKey && existing.previousKey !== key) {
+      deletePrivateFile(existing.previousKey).catch((error) => console.warn("Old course cover cleanup failed", error));
+    }
+    response.json({ thumbnailUrl: `/api/courses/${existing.id}/thumbnail?v=${Date.now()}` });
+  })
+);
+
+courseRouter.delete(
+  "/admin/courses/:id/thumbnail",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["admin"]);
+    const db = requireDatabase();
+    const [existing] = await db.select({ id: courses.id, key: courses.thumbnailUrl }).from(courses)
+      .where(eq(courses.id, String(request.params.id))).limit(1);
+    if (!existing) { response.status(404).json({ message: "Course not found." }); return; }
+
+    await db.update(courses).set({ thumbnailUrl: null, updatedAt: new Date() }).where(eq(courses.id, existing.id));
+    if (existing.key) {
+      deletePrivateFile(existing.key).catch((error) => console.warn("Course cover file cleanup failed", error));
+    }
+    response.json({ message: "Course cover photo removed.", thumbnailUrl: null });
+  })
+);
+
+courseRouter.post(
+  "/admin/course-sections",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const input = sectionInput.parse(request.body);
+    const db = requireDatabase();
+    const [created] = await db
+      .insert(courseSections)
+      .values(input)
+      .returning();
+    response.status(201).json({ section: created });
+  })
+);
+
+courseRouter.post(
+  "/admin/lessons",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const input = lessonInput.parse(request.body);
+    const db = requireDatabase();
+    const [created] = await db.insert(lessons).values(input).returning();
+    response.status(201).json({ lesson: created });
+  })
+);
+
+courseRouter.patch(
+  "/admin/course-sections/:id",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const input = sectionUpdateInput.parse(request.body);
+    const db = requireDatabase();
+    const [section] = await db.update(courseSections).set(input)
+      .where(eq(courseSections.id, String(request.params.id))).returning();
+    if (!section) { response.status(404).json({ message: "Section not found." }); return; }
+    response.json({ section });
+  })
+);
+
+courseRouter.patch(
+  "/admin/lessons/:id",
+  asyncRoute(async (request, response) => {
+    await requireRole(request, ["staff", "admin"]);
+    const input = lessonUpdateInput.parse(request.body);
+    const db = requireDatabase();
+    const [lesson] = await db.update(lessons).set(input)
+      .where(eq(lessons.id, String(request.params.id))).returning();
+    if (!lesson) { response.status(404).json({ message: "Lesson not found." }); return; }
+    response.json({ lesson });
+  })
+);

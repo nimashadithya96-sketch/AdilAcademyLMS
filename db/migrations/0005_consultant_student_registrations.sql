@@ -1,0 +1,27 @@
+CREATE TABLE "consultant_student_registrations" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "consultant_user_id" uuid NOT NULL,
+  "parent_account_id" uuid NOT NULL,
+  "pay_id_id" uuid NOT NULL,
+  "course_id" uuid NOT NULL,
+  "first_name" text NOT NULL,
+  "last_name" text NOT NULL,
+  "email" text NOT NULL,
+  "phone" text NOT NULL,
+  "date_of_birth" text NOT NULL,
+  "nic_or_passport" text,
+  "address_line_1" text NOT NULL,
+  "address_line_2" text,
+  "province" text NOT NULL,
+  "district" text NOT NULL,
+  "city" text NOT NULL,
+  "side" "account_side" NOT NULL,
+  "status" text DEFAULT 'AWAITING_PAYMENT' NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  CONSTRAINT "consultant_student_registrations_consultant_user_id_users_id_fk" FOREIGN KEY ("consultant_user_id") REFERENCES "public"."users"("id"),
+  CONSTRAINT "consultant_student_registrations_parent_account_id_network_accounts_id_fk" FOREIGN KEY ("parent_account_id") REFERENCES "public"."network_accounts"("id"),
+  CONSTRAINT "consultant_student_registrations_pay_id_id_payment_reference_ids_id_fk" FOREIGN KEY ("pay_id_id") REFERENCES "public"."payment_reference_ids"("id"),
+  CONSTRAINT "consultant_student_registrations_course_id_courses_id_fk" FOREIGN KEY ("course_id") REFERENCES "public"."courses"("id")
+);
+CREATE UNIQUE INDEX "consultant_student_registrations_pay_id_unique" ON "consultant_student_registrations" USING btree ("pay_id_id");

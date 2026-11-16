@@ -1,0 +1,29 @@
+modules = ["nodejs-22"]
+run = "npm run dev"
+
+[deployment]
+build = ["sh", "-c", "npm run build"]
+run = ["sh", "-c", "npm start"]
+deploymentTarget = "gce"
+ignorePorts = false
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 24678
+
+[agent]
+expertMode = true
+
+[objectStorage]
+defaultBucketID = "replit-objstore-ffcb7931-d598-4eba-8c80-6132a73e8ea7"
